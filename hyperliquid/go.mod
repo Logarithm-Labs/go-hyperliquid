@@ -1,4 +1,4 @@
-module github.com/Logarith-Labs/go-hyperliquid/hyperliquid
+module github.com/Logarithm-Labs/go-hyperliquid/hyperliquid
 
 go 1.21.10
 
