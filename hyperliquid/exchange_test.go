@@ -1,6 +1,7 @@
 package hyperliquid
 
 import (
+	"math"
 	"os"
 	"testing"
 	"time"
@@ -71,6 +72,14 @@ func TestExchangeAPI_MarketOpen(testing *testing.T) {
 		testing.Errorf("MakeOpen() error = %v", err)
 	}
 	testing.Logf("MakeOpen() = %v", res)
+	avgPrice := res.Response.Data.Statuses[0].Filled.AvgPx
+	if avgPrice == 0 {
+		testing.Errorf("res.Response.Data.Statuses[0].Filled.AvgPx = %v", avgPrice)
+	}
+	totalSize := res.Response.Data.Statuses[0].Filled.TotalSz
+	if totalSize != math.Abs(size) {
+		testing.Errorf("res.Response.Data.Statuses[0].Filled.TotalSz = %v", totalSize)
+	}
 	accountState, err := exchangeAPI.infoAPI.GetUserState(exchangeAPI.AccountAddress())
 	if err != nil {
 		testing.Errorf("GetAccountState() error = %v", err)

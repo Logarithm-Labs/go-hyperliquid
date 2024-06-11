@@ -147,9 +147,9 @@ type CloseRequest struct {
 }
 
 type FilledStatus struct {
-	OrderId int    `json:"oid"`
-	AvgPx   string `json:"avgPx"`
-	TotalSz string `json:"totalSz"`
+	OrderId int     `json:"oid"`
+	AvgPx   float64 `json:"avgPx,string"`
+	TotalSz float64 `json:"totalSz,string"`
 }
 
 type Liquidation struct {
