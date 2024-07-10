@@ -91,18 +91,18 @@ type Meta struct {
 
 type OrderFill struct {
 	Cloid         string       `json:"cloid"`
-	ClosedPnl     string       `json:"closedPnl"`
+	ClosedPnl     float64      `json:"closedPnl,string"`
 	Coin          string       `json:"coin"`
 	Crossed       bool         `json:"crossed"`
 	Dir           string       `json:"dir"`
-	Fee           string       `json:"fee"`
+	Fee           float64      `json:"fee,string"`
 	FeeToken      string       `json:"feeToken"`
 	Hash          string       `json:"hash"`
 	Oid           int          `json:"oid"`
-	Px            string       `json:"px"`
+	Px            float64      `json:"px,string"`
 	Side          string       `json:"side"`
 	StartPosition string       `json:"startPosition"`
-	Sz            string       `json:"sz"`
+	Sz            float64      `json:"sz,string"`
 	Tid           int64        `json:"tid"`
 	Time          int64        `json:"time"`
 	Liquidation   *Liquidation `json:"liquidation"`

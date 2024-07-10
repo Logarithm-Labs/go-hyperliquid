@@ -11,6 +11,9 @@ func GetInfoAPI() *InfoAPI {
 		api.SetDebugActive()
 	}
 	TEST_ADDRESS := os.Getenv("TEST_ADDRESS")
+	if TEST_ADDRESS == "" {
+		panic("Set TEST_ADDRESS in .env file")
+	}
 	api.SetAccountAddress(TEST_ADDRESS)
 	return api
 }
@@ -60,6 +63,17 @@ func TestInfoAPI_GetAccountFills(t *testing.T) {
 	}
 	if len(*res) == 0 {
 		t.Errorf("GetAccountFills() len = %v, want > %v", res, 0)
+	}
+	res0 := (*res)[0]
+	t.Logf("res0 = %+v", res0)
+	if res0.Px == 0 {
+		t.Errorf("res0.Px = %v, want > %v", res0.Px, 0)
+	}
+	if res0.Sz == 0 {
+		t.Errorf("res0.Sz = %v, want > %v", res0.Sz, 0)
+	}
+	if res0.Fee == 0 {
+		t.Errorf("res0.Fee = %v, want > %v", res0.Fee, 0)
 	}
 	t.Logf("GetAccountFills() = %v", res)
 }
