@@ -34,10 +34,18 @@ func (api *ExchangeAPI) SignUserSignableAction(action any, payloadTypes []apityp
 }
 
 func (api *ExchangeAPI) SignL1Action(action any, timestamp uint64) (byte, [32]byte, [32]byte, error) {
+	srequest, err := api.BuildEIP712Message(action, timestamp)
+	if err != nil {
+		api.debug("Error building EIP712 message: %s", err)
+		return 0, [32]byte{}, [32]byte{}, err
+	}
+	return api.Sign(srequest)
+}
+
+func (api *ExchangeAPI) BuildEIP712Message(action any, timestamp uint64) (*SignRequest, error) {
 	hash, err := buildActionHash(action, "", timestamp)
 	if err != nil {
-		api.debug("Error building action hash: %s", err)
-		return 0, [32]byte{}, [32]byte{}, err
+		return nil, err
 	}
 	message := buildMessage(hash.Bytes(), api.IsMainnet())
 	srequest := &SignRequest{
@@ -56,7 +64,7 @@ func (api *ExchangeAPI) SignL1Action(action any, timestamp uint64) (byte, [32]by
 		DTypeMsg:  message,
 		IsMainNet: api.IsMainnet(),
 	}
-	return api.Sign(srequest)
+	return srequest, nil
 }
 
 func (api *ExchangeAPI) SignWithdrawAction(action WithdrawAction) (byte, [32]byte, [32]byte, error) {

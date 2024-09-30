@@ -64,13 +64,7 @@ func NewSigner(manager *PKeyManager) Signer {
 }
 
 func (signer *Signer) Sign(request *SignRequest) (byte, [32]byte, [32]byte, error) {
-	typedData := apitypes.TypedData{
-		Domain:      request.GetDomain(),
-		Types:       request.GetTypes(),
-		PrimaryType: request.PrimaryType,
-		Message:     request.DTypeMsg,
-	}
-	return signer.signInternal(typedData)
+	return signer.signInternal(SignRequestToEIP712TypedData(request))
 }
 
 // signInternal signs the typed data and returns the signature in VRS format
@@ -87,6 +81,15 @@ func (signer *Signer) signInternal(message apitypes.TypedData) (byte, [32]byte, 
 		return 0, [32]byte{}, [32]byte{}, err
 	}
 	return SignatureToVRS(signature)
+}
+
+func SignRequestToEIP712TypedData(request *SignRequest) apitypes.TypedData {
+	return apitypes.TypedData{
+		Domain:      request.GetDomain(),
+		Types:       request.GetTypes(),
+		PrimaryType: request.PrimaryType,
+		Message:     request.DTypeMsg,
+	}
 }
 
 func SignatureToVRS(sig []byte) (byte, [32]byte, [32]byte, error) {

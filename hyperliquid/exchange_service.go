@@ -3,6 +3,8 @@ package hyperliquid
 import (
 	"fmt"
 	"math"
+
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
 // IExchangeAPI is an interface for the /exchange service.
@@ -307,4 +309,25 @@ func (api *ExchangeAPI) getChainParams() (string, string) {
 		return "0xa4b1", "Mainnet"
 	}
 	return "0x66eee", "Testnet"
+}
+
+// Build bulk orders EIP712 message
+func (api *ExchangeAPI) BuildBulkOrdersEIP712(requests []OrderRequest, grouping Grouping) (apitypes.TypedData, error) {
+	var wires []OrderWire
+	for _, req := range requests {
+		wires = append(wires, OrderRequestToWire(req, api.meta))
+	}
+	timestamp := GetNonce()
+	action := OrderWiresToOrderAction(wires, grouping)
+	srequest, err := api.BuildEIP712Message(action, timestamp)
+	if err != nil {
+		api.debug("Error building EIP712 message: %s", err)
+		return apitypes.TypedData{}, err
+	}
+	return SignRequestToEIP712TypedData(srequest), nil
+}
+
+// Build order EIP712 message
+func (api *ExchangeAPI) BuildOrderEIP712(request OrderRequest, grouping Grouping) (apitypes.TypedData, error) {
+	return api.BuildBulkOrdersEIP712([]OrderRequest{request}, grouping)
 }
