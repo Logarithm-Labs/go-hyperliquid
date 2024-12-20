@@ -240,6 +240,7 @@ func (api *InfoAPI) GetWithdrawals(address string) (*[]Withdrawal, error) {
 	for _, update := range *updates {
 		if update.Delta.Type == "withdraw" {
 			withrawal := Withdrawal{
+				Time:   update.Time,
 				Hash:   update.Hash,
 				Amount: update.Delta.Usdc,
 				Fee:    update.Delta.Fee,
@@ -256,6 +257,35 @@ func (api *InfoAPI) GetWithdrawals(address string) (*[]Withdrawal, error) {
 // Check AccountAddress() or SetAccountAddress() if there is a need to set the account address
 func (api *InfoAPI) GetAccountWithdrawals() (*[]Withdrawal, error) {
 	return api.GetWithdrawals(api.AccountAddress())
+}
+
+// Helper function to get the deposits of the given address
+// By default returns last 90 days
+func (api *InfoAPI) GetDeposits(address string) (*[]Deposit, error) {
+	startTime, endTime := GetDefaultTimeRange()
+	updates, err := api.GetNonFundingUpdates(address, startTime, endTime)
+	if err != nil {
+		return nil, err
+	}
+	var deposits []Deposit
+	for _, update := range *updates {
+		if update.Delta.Type == "deposit" {
+			deposit := Deposit{
+				Hash:   update.Hash,
+				Amount: update.Delta.Usdc,
+				Time:   update.Time,
+			}
+			deposits = append(deposits, deposit)
+		}
+	}
+	return &deposits, nil
+}
+
+// Helper function to get the deposits of the account address
+// The same as GetDeposits but user is set to the account address
+// Check AccountAddress() or SetAccountAddress() if there is a need to set the account address
+func (api *InfoAPI) GetAccountDeposits() (*[]Deposit, error) {
+	return api.GetDeposits(api.AccountAddress())
 }
 
 // Helper function to build a map of asset names to asset info

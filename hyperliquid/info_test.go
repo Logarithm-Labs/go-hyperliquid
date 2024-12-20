@@ -247,6 +247,23 @@ func TestInfoAPI_GetAccountWithdrawals(t *testing.T) {
 	t.Logf("GetAccountWithdrawals() = %v", res)
 }
 
+func TestInfoAPI_GetAccountDeposits(t *testing.T) {
+	api := GetInfoAPI()
+	res, err := api.GetAccountDeposits()
+	if err != nil {
+		t.Errorf("GetAccountDeposits() error = %v", err)
+	}
+	if len(*res) == 0 {
+		t.Errorf("GetAccountDeposits() len = %v, want > %v", res, 0)
+	}
+	for _, deposit := range *res {
+		if deposit.Amount == 0 {
+			t.Errorf("deposit.Amount = %v, want > %v", deposit.Amount, 0)
+		}
+	}
+	t.Logf("GetAccountDeposits() = %v", res)
+}
+
 func TestInfoAPI_GetMarketPx(t *testing.T) {
 	api := GetInfoAPI()
 	res, err := api.GetMartketPx("BTC")

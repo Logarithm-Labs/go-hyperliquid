@@ -191,10 +191,17 @@ type FundingDelta struct {
 }
 
 type Withdrawal struct {
+	Time   int64   `json:"time"`
 	Hash   string  `json:"hash"`
 	Amount float64 `json:"usdc"`
 	Fee    float64 `json:"fee"`
 	Nonce  int64   `json:"nonce"`
+}
+
+type Deposit struct {
+	Hash   string  `json:"hash,omitempty"`
+	Time   int64   `json:"time,omitempty"`
+	Amount float64 `json:"usdc,omitempty"`
 }
 
 type WithdrawAction struct {
