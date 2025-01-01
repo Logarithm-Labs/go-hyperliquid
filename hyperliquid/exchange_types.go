@@ -15,8 +15,10 @@ type ExchangeRequest struct {
 }
 
 type AssetInfo struct {
-	SzDecimals int
-	AssetId    int
+	SzDecimals  int
+	WeiDecimals int
+	AssetId     int
+	SpotName    string // for spot asset (e.g. "@107")
 }
 
 type OrderRequest struct {

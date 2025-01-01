@@ -39,27 +39,28 @@ func MakeUniversalRequest[T any](api IAPIService, request any) (*T, error) {
 	if api.Endpoint() == "/exchange" && api.KeyManager() == nil {
 		return nil, APIError{Message: "API key not set"}
 	}
+
 	response, err := api.Request(api.Endpoint(), request)
 	if err != nil {
 		return nil, err
 	}
+
 	var result T
 	err = json.Unmarshal(response, &result)
-	if err != nil {
-		api.debug("Error json.Unmarshal: %s", err)
-		var errResult map[string]interface{}
-		err = json.Unmarshal(response, &errResult)
-		if err != nil {
-			api.debug("Error second json.Unmarshal: %s", err)
-			return nil, APIError{Message: "Unexpected response"}
-		}
-		// Check if the result is an error
-		// Return an APIError if it is
-		if errResult["status"] == "err" {
-			return nil, APIError{Message: errResult["response"].(string)}
-		} else {
-			return nil, APIError{Message: fmt.Sprintf("Unexpected response: %v", errResult)}
-		}
+	if err == nil {
+		return &result, nil
 	}
-	return &result, nil
+
+	var errResult map[string]interface{}
+	err = json.Unmarshal(response, &errResult)
+	if err != nil {
+		api.debug("Error second json.Unmarshal: %s", err)
+		return nil, APIError{Message: "Unexpected response"}
+	}
+
+	if errResult["status"] == "err" {
+		return nil, APIError{Message: errResult["response"].(string)}
+	}
+
+	return nil, APIError{Message: fmt.Sprintf("Unexpected response: %v", errResult)}
 }

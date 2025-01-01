@@ -1,6 +1,8 @@
 package hyperliquid
 
 import (
+	"encoding/json"
+	"fmt"
 	"strconv"
 )
 
@@ -38,16 +40,24 @@ type IInfoAPI interface {
 type InfoAPI struct {
 	Client
 	baseEndpoint string
+	spotMeta     map[string]AssetInfo
 }
 
 // NewInfoAPI returns a new instance of the InfoAPI struct.
 // It sets the base endpoint to "/info" and the client to the NewClient function.
 // The isMainnet parameter is used to set the network type.
 func NewInfoAPI(isMainnet bool) *InfoAPI {
-	return &InfoAPI{
+	api := InfoAPI{
 		baseEndpoint: "/info",
 		Client:       *NewClient(isMainnet),
 	}
+	spotMeta, err := api.BuildSpotMetaMap()
+	if err != nil {
+		api.SetDebugActive()
+		api.debug("Error building meta map: %s", err)
+	}
+	api.spotMeta = spotMeta
+	return &api
 }
 
 func (api *InfoAPI) Endpoint() string {
@@ -61,6 +71,41 @@ func (api *InfoAPI) GetAllMids() (*map[string]string, error) {
 		Typez: "allMids",
 	}
 	return MakeUniversalRequest[map[string]string](api, request)
+}
+
+// Retrieve spot meta and asset contexts
+// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/spot#retrieve-spot-asset-contexts
+func (api *InfoAPI) GetAllSpotPrices() (*map[string]string, error) {
+	request := InfoRequest{
+		Typez: "spotMetaAndAssetCtxs",
+	}
+	response, err := MakeUniversalRequest[SpotMetaAndAssetCtxsResponse](api, request)
+	if err != nil {
+		return nil, err
+	}
+
+	marketsData, ok := response[1].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid markets data format")
+	}
+
+	result := make(map[string]string)
+
+	marketBytes, err := json.Marshal(marketsData)
+	if err != nil {
+		return nil, err
+	}
+
+	var markets []Market
+	if err := json.Unmarshal(marketBytes, &markets); err != nil {
+		return nil, err
+	}
+
+	for _, market := range markets {
+		result[market.Coin] = market.MidPx
+	}
+
+	return &result, nil
 }
 
 // Retrieve a user's open orders
@@ -148,6 +193,14 @@ func (api *InfoAPI) GetMeta() (*Meta, error) {
 	return MakeUniversalRequest[Meta](api, request)
 }
 
+// Retrieve spot metadata
+func (api *InfoAPI) GetSpotMeta() (*SpotMeta, error) {
+	request := InfoRequest{
+		Typez: "spotMeta",
+	}
+	return MakeUniversalRequest[SpotMeta](api, request)
+}
+
 // Retrieve user's perpetuals account summary
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals#retrieve-users-perpetuals-account-summary
 func (api *InfoAPI) GetUserState(address string) (*UserState, error) {
@@ -228,6 +281,21 @@ func (api *InfoAPI) GetMartketPx(coin string) (float64, error) {
 	return parsed, nil
 }
 
+// GetSpotMarketPx returns the market price of a given spot coin
+func (api *InfoAPI) GetSpotMarketPx(coin string) (float64, error) {
+	spotPrices, err := api.GetAllSpotPrices()
+	if err != nil {
+		return 0, err
+	}
+
+	spotName := api.spotMeta[coin].SpotName
+	parsed, err := strconv.ParseFloat((*spotPrices)[spotName], 32)
+	if err != nil {
+		return 0, err
+	}
+	return parsed, nil
+}
+
 // Helper function to get the withdrawals of a given address
 // By default returns last 90 days
 func (api *InfoAPI) GetWithdrawals(address string) (*[]Withdrawal, error) {
@@ -300,6 +368,47 @@ func (api *InfoAPI) BuildMetaMap() (map[string]AssetInfo, error) {
 		metaMap[asset.Name] = AssetInfo{
 			SzDecimals: asset.SzDecimals,
 			AssetId:    index,
+		}
+	}
+	return metaMap, nil
+}
+
+// Helper function to build a map of asset names to asset info
+// It is used to get the assetId for a given asset name
+func (api *InfoAPI) BuildSpotMetaMap() (map[string]AssetInfo, error) {
+	spotMeta, err := api.GetSpotMeta()
+	if err != nil {
+		return nil, err
+	}
+
+	tokenMap := make(map[int]struct {
+		name        string
+		szDecimals  int
+		weiDecimals int
+	}, len(spotMeta.Tokens))
+
+	for _, token := range spotMeta.Tokens {
+		tokenMap[token.Index] = struct {
+			name        string
+			szDecimals  int
+			weiDecimals int
+		}{token.Name, token.SzDecimals, token.WeiDecimals}
+	}
+
+	metaMap := make(map[string]AssetInfo)
+	for _, universe := range spotMeta.Universe {
+		for _, tokenId := range universe.Tokens {
+			if tokenId == 0 {
+				continue
+			}
+			if token, exists := tokenMap[tokenId]; exists {
+				metaMap[token.name] = AssetInfo{
+					SzDecimals:  token.szDecimals,
+					WeiDecimals: token.weiDecimals,
+					AssetId:     universe.Index,
+					SpotName:    universe.Name,
+				}
+			}
 		}
 	}
 	return metaMap, nil

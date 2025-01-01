@@ -85,6 +85,25 @@ type MarginSummary struct {
 	TotalRawUsd     float64 `json:"totalRawUsd,string"`
 }
 
+type SpotMeta struct {
+	Universe []struct {
+		Tokens      []int  `json:"tokens"`
+		Name        string `json:"name"`
+		Index       int    `json:"index"`
+		IsCanonical bool   `json:"isCanonical"`
+	} `json:"universe"`
+	Tokens []struct {
+		Name        string `json:"name"`
+		SzDecimals  int    `json:"szDecimals"`
+		WeiDecimals int    `json:"weiDecimals"`
+		Index       int    `json:"index"`
+		TokenID     string `json:"tokenId"`
+		IsCanonical bool   `json:"isCanonical"`
+		EvmContract any    `json:"evmContract"`
+		FullName    any    `json:"fullName"`
+	} `json:"tokens"`
+}
+
 type Meta struct {
 	Universe []Asset `json:"universe"`
 }
@@ -178,4 +197,17 @@ type RatesLimits struct {
 	CumVlm        float64 `json:"cumVlm,string"`
 	NRequestsUsed int     `json:"nRequestsUsed"`
 	NRequestsCap  int     `json:"nRequestsCap"`
+}
+
+type SpotMetaAndAssetCtxsResponse [2]interface{} // Array of exactly 2 elements
+
+type Market struct {
+	PrevDayPx         string `json:"prevDayPx,omitempty"`
+	DayNtlVlm         string `json:"dayNtlVlm,omitempty"`
+	MarkPx            string `json:"markPx,omitempty"`
+	MidPx             string `json:"midPx,omitempty"`
+	CirculatingSupply string `json:"circulatingSupply,omitempty"`
+	Coin              string `json:"coin,omitempty"`
+	TotalSupply       string `json:"totalSupply,omitempty"`
+	DayBaseVlm        string `json:"dayBaseVlm,omitempty"`
 }

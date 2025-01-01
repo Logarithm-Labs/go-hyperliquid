@@ -42,10 +42,25 @@ func OrderWiresToOrderAction(orders []OrderWire, grouping Grouping) PlaceOrderAc
 	}
 }
 
-func OrderRequestToWire(req OrderRequest, meta map[string]AssetInfo) OrderWire {
-	info := meta[req.Coin]
+func OrderRequestToWire(req OrderRequest, meta map[string]AssetInfo, isSpot bool) OrderWire {
+
+	var info AssetInfo
+	for _, v := range meta {
+		if v.SpotName == req.Coin {
+			info = v
+			break
+		}
+	}
+
+	var assetId int
+	if isSpot {
+		assetId = info.AssetId + 10000
+	} else {
+		assetId = info.AssetId
+	}
+
 	return OrderWire{
-		Asset:      info.AssetId,
+		Asset:      assetId,
 		IsBuy:      req.IsBuy,
 		LimitPx:    FloatToWire(req.LimitPx, nil),
 		SizePx:     FloatToWire(req.Sz, &info.SzDecimals),

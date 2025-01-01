@@ -36,6 +36,7 @@ type ExchangeAPI struct {
 	address      string
 	baseEndpoint string
 	meta         map[string]AssetInfo
+	spotMeta     map[string]AssetInfo
 }
 
 // NewExchangeAPI creates a new default ExchangeAPI.
@@ -54,6 +55,14 @@ func NewExchangeAPI(isMainnet bool) *ExchangeAPI {
 		api.debug("Error building meta map: %s", err)
 	}
 	api.meta = meta
+
+	spotMeta, err := api.infoAPI.BuildSpotMetaMap()
+	if err != nil {
+		api.SetDebugActive()
+		api.debug("Error building spot meta map: %s", err)
+	}
+	api.spotMeta = spotMeta
+
 	return &api
 }
 
@@ -69,6 +78,17 @@ func (api *ExchangeAPI) SlippagePrice(coin string, isBuy bool, slippage float64)
 		return 0.0
 	}
 	return CalculateSlippage(isBuy, marketPx, slippage)
+}
+
+// SlippagePriceSpot is a helper function to calculate the slippage price for a spot coin.
+func (api *ExchangeAPI) SlippagePriceSpot(coin string, isBuy bool, slippage float64) float64 {
+	marketPx, err := api.infoAPI.GetSpotMarketPx(coin)
+	if err != nil {
+		api.debug("Error getting market price: %s", err)
+		return 0.0
+	}
+	slippagePrice := CalculateSlippage(isBuy, marketPx, slippage)
+	return slippagePrice
 }
 
 // Open a market order.
@@ -96,6 +116,29 @@ func (api *ExchangeAPI) MarketOrder(coin string, size float64, slippage *float64
 		ReduceOnly: false,
 	}
 	return api.Order(orderRequest, GroupingNa)
+}
+
+// MarketOrderSpot is a market order for a spot coin.
+// It is used to buy/sell a spot coin.
+func (api *ExchangeAPI) MarketOrderSpot(coin string, size float64, slippage *float64) (*PlaceOrderResponse, error) {
+	spotName := api.spotMeta[coin].SpotName
+	slpg := GetSlippage(slippage)
+	isBuy := IsBuy(size)
+	finalPx := api.SlippagePriceSpot(coin, isBuy, slpg)
+	orderType := OrderType{
+		Limit: &LimitOrderType{
+			Tif: TifIoc,
+		},
+	}
+	orderRequest := OrderRequest{
+		Coin:       spotName,
+		IsBuy:      isBuy,
+		Sz:         math.Abs(size),
+		LimitPx:    finalPx,
+		OrderType:  orderType,
+		ReduceOnly: false,
+	}
+	return api.OrderSpot(orderRequest, GroupingNa)
 }
 
 // Open a limit order.
@@ -168,12 +211,39 @@ func (api *ExchangeAPI) Order(request OrderRequest, grouping Grouping) (*PlaceOr
 	return api.BulkOrders([]OrderRequest{request}, grouping)
 }
 
+// OrderSpot places a spot order
+func (api *ExchangeAPI) OrderSpot(request OrderRequest, grouping Grouping) (*PlaceOrderResponse, error) {
+	return api.BulkOrdersSpot([]OrderRequest{request}, grouping)
+}
+
 // Place orders in bulk
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint#place-an-order
 func (api *ExchangeAPI) BulkOrders(requests []OrderRequest, grouping Grouping) (*PlaceOrderResponse, error) {
 	var wires []OrderWire
 	for _, req := range requests {
-		wires = append(wires, OrderRequestToWire(req, api.meta))
+		wires = append(wires, OrderRequestToWire(req, api.meta, false))
+	}
+	timestamp := GetNonce()
+	action := OrderWiresToOrderAction(wires, grouping)
+	v, r, s, err := api.SignL1Action(action, timestamp)
+	if err != nil {
+		api.debug("Error signing L1 action: %s", err)
+		return nil, err
+	}
+	request := ExchangeRequest{
+		Action:       action,
+		Nonce:        timestamp,
+		Signature:    ToTypedSig(r, s, v),
+		VaultAddress: nil,
+	}
+	return MakeUniversalRequest[PlaceOrderResponse](api, request)
+}
+
+// BulkOrdersSpot places spot orders
+func (api *ExchangeAPI) BulkOrdersSpot(requests []OrderRequest, grouping Grouping) (*PlaceOrderResponse, error) {
+	var wires []OrderWire
+	for _, req := range requests {
+		wires = append(wires, OrderRequestToWire(req, api.spotMeta, true))
 	}
 	timestamp := GetNonce()
 	action := OrderWiresToOrderAction(wires, grouping)
@@ -315,7 +385,7 @@ func (api *ExchangeAPI) getChainParams() (string, string) {
 func (api *ExchangeAPI) BuildBulkOrdersEIP712(requests []OrderRequest, grouping Grouping) (apitypes.TypedData, error) {
 	var wires []OrderWire
 	for _, req := range requests {
-		wires = append(wires, OrderRequestToWire(req, api.meta))
+		wires = append(wires, OrderRequestToWire(req, api.meta, false))
 	}
 	timestamp := GetNonce()
 	action := OrderWiresToOrderAction(wires, grouping)
