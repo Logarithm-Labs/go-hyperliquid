@@ -1,10 +1,12 @@
 package hyperliquid
 
-const GLOBAL_DEBUG = false // Defualt debug that is used in all tests
+const GLOBAL_DEBUG = true // Defualt debug that is used in all tests
 
 // Execution constants
 const DEFAULT_SLIPPAGE = 0.005 // 0.5% default slippage
-var SZ_DECIMALS = 2            // Default decimals for size
+const SPOT_MAX_DECIMALS = 8    // Default decimals for spot
+const PERP_MAX_DECIMALS = 6    // Default decimals for perp
+var SZ_DECIMALS = 2            // Default decimals for usdc
 
 // Signing constants
 const HYPERLIQUID_CHAIN_ID = 1337

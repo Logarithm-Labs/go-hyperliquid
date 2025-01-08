@@ -80,6 +80,7 @@ func TestExchangeAPI_MarketOpen(testing *testing.T) {
 	if totalSize != math.Abs(size) {
 		testing.Errorf("res.Response.Data.Statuses[0].Filled.TotalSz = %v", totalSize)
 	}
+	time.Sleep(2 * time.Second) // wait to execute order
 	accountState, err := exchangeAPI.infoAPI.GetUserState(exchangeAPI.AccountAddress())
 	if err != nil {
 		testing.Errorf("GetAccountState() error = %v", err)
@@ -157,7 +158,7 @@ func TestExchangeAPI_MarketClose(testing *testing.T) {
 
 func TestExchangeAPI_TestWithdraw(testing *testing.T) {
 	exchangeAPI := GetExchangeAPI()
-	withdrawAmount := 2.0
+	withdrawAmount := 10.0
 	stateBefore, err := exchangeAPI.infoAPI.GetUserState(exchangeAPI.AccountAddress())
 	if err != nil {
 		testing.Errorf("GetAccountState() error = %v", err)
@@ -182,5 +183,20 @@ func TestExchangeAPI_TestWithdraw(testing *testing.T) {
 	balanceAfter := stateAfter.Withdrawable
 	if balanceAfter >= balanceBefore {
 		testing.Errorf("Balance not updated: %v", stateAfter)
+	}
+}
+
+func TestExchageAPI_TestMarketOrderSpot(testing *testing.T) {
+	exchangeAPI := GetExchangeAPI()
+	size := 1600.0
+	coin := "YEETI"
+	res, err := exchangeAPI.MarketOrderSpot(coin, size, nil)
+	if err != nil {
+		testing.Errorf("MakeOpen() error = %v", err)
+	}
+	testing.Logf("MakeOpen() = %v", res)
+	avgPrice := res.Response.Data.Statuses[0].Filled.AvgPx
+	if avgPrice == 0 {
+		testing.Errorf("res.Response.Data.Statuses[0].Filled.AvgPx = %v", avgPrice)
 	}
 }

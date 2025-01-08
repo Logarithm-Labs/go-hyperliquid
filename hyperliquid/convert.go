@@ -43,27 +43,21 @@ func OrderWiresToOrderAction(orders []OrderWire, grouping Grouping) PlaceOrderAc
 }
 
 func OrderRequestToWire(req OrderRequest, meta map[string]AssetInfo, isSpot bool) OrderWire {
-
-	var info AssetInfo
-	for _, v := range meta {
-		if v.SpotName == req.Coin {
-			info = v
-			break
-		}
-	}
-
-	var assetId int
+	info := meta[req.Coin]
+	var assetId, maxDecimals int
 	if isSpot {
+		// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/asset-ids
 		assetId = info.AssetId + 10000
+		maxDecimals = SPOT_MAX_DECIMALS
 	} else {
 		assetId = info.AssetId
+		maxDecimals = PERP_MAX_DECIMALS
 	}
-
 	return OrderWire{
 		Asset:      assetId,
 		IsBuy:      req.IsBuy,
-		LimitPx:    FloatToWire(req.LimitPx, nil),
-		SizePx:     FloatToWire(req.Sz, &info.SzDecimals),
+		LimitPx:    FloatToWire(req.LimitPx, maxDecimals, info.SzDecimals),
+		SizePx:     FloatToWire(req.Sz, maxDecimals, info.SzDecimals),
 		ReduceOnly: req.ReduceOnly,
 		OrderType:  OrderTypeToWire(req.OrderType),
 	}
@@ -90,28 +84,28 @@ func OrderTypeToWire(orderType OrderType) OrderTypeWire {
 	return OrderTypeWire{}
 }
 
-// Format the float with custom decimal places, default is 6.
-// Hyperliquid only allows at most 6 digits.
-func FloatToWire(x float64, szDecimals *int) string {
+// Format the float with custom decimal places, default is 6 (perp), 8 (spot).
+// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/tick-and-lot-size
+func FloatToWire(x float64, maxDecimals int, szDecimals int) string {
 	bigf := big.NewFloat(x)
 	var maxDecSz uint
-	if szDecimals != nil {
-		maxDecSz = uint(*szDecimals)
+	intPart, _ := bigf.Int64()
+	intSize := len(strconv.FormatInt(intPart, 10))
+	if intSize >= maxDecimals {
+		maxDecSz = 0
 	} else {
-		intPart, _ := bigf.Int64()
-		intSize := len(strconv.FormatInt(intPart, 10))
-		if intSize >= 6 {
-			maxDecSz = 0
-		} else {
-			maxDecSz = uint(6 - intSize)
-		}
+		maxDecSz = uint(maxDecimals - intSize)
 	}
 	x, _ = bigf.Float64()
 	rounded := fmt.Sprintf("%.*f", maxDecSz, x)
-	for strings.HasSuffix(rounded, "0") {
-		rounded = strings.TrimSuffix(rounded, "0")
+	if strings.Contains(rounded, ".") {
+		for strings.HasSuffix(rounded, "0") {
+			rounded = strings.TrimSuffix(rounded, "0")
+		}
 	}
-	rounded = strings.TrimSuffix(rounded, ".")
+	if strings.HasSuffix(rounded, ".") {
+		rounded = strings.TrimSuffix(rounded, ".")
+	}
 	return rounded
 }
 

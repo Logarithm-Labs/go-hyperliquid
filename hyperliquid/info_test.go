@@ -10,6 +10,8 @@ func GetInfoAPI() *InfoAPI {
 	if GLOBAL_DEBUG {
 		api.SetDebugActive()
 	}
+	// It should be active account to pass all tests
+	// like GetAccountFills, GetAccountWithdrawals, etc.
 	TEST_ADDRESS := os.Getenv("TEST_ADDRESS")
 	if TEST_ADDRESS == "" {
 		panic("Set TEST_ADDRESS in .env file")
@@ -293,4 +295,72 @@ func TestInfoAPI_BuildMetaMap(t *testing.T) {
 		t.Errorf("BuildMetaMap() = %v, want %v", res, "ETH")
 	}
 	t.Logf("BuildMetaMap() = %v", res)
+}
+
+func TestInfoAPI_BuildSpotMetaMap(t *testing.T) {
+	api := GetInfoAPI()
+	res, err := api.BuildSpotMetaMap()
+	if err != nil {
+		t.Errorf("BuildSpotMetaMap() error = %v", err)
+	}
+	if len(res) == 0 {
+		t.Errorf("BuildSpotMetaMap() = %v, want > %v", res, 0)
+	}
+	// check PURR, HYPE in map
+	if _, ok := res["PURR"]; !ok {
+		t.Errorf("BuildSpotMetaMap() = %v, want %v", res, "PURR")
+	}
+	if _, ok := res["HYPE"]; !ok {
+		t.Errorf("BuildSpotMetaMap() = %v, want %v", res, "HYPE")
+	}
+	t.Logf("map(PURR) = %+v", res["PURR"])
+	t.Logf("BuildSpotMetaMap() = %+v", res)
+}
+
+func TestInfoAPI_GetSpotMeta(t *testing.T) {
+	api := GetInfoAPI()
+	res, err := api.GetSpotMeta()
+	if err != nil {
+		t.Errorf("GetSpotMeta() error = %v", err)
+	}
+	if len(res.Tokens) == 0 {
+		t.Errorf("GetSpotMeta() = %v, want > %v", res, 0)
+	}
+	t.Logf("GetSpotMeta() = %v", res)
+}
+
+func TestInfoAPI_GetAllSpotPrices(t *testing.T) {
+	api := GetInfoAPI()
+	res, err := api.GetAllSpotPrices()
+	if err != nil {
+		t.Errorf("GetAllSpotPrices() error = %v", err)
+	}
+	if len(*res) == 0 {
+		t.Errorf("GetAllSpotPrices() = %v, want > %v", res, 0)
+	}
+	t.Logf("GetAllSpotPrices() = %+v", res)
+}
+
+func TestInfoAPI_GetSpotMarketPx(t *testing.T) {
+	api := GetInfoAPI()
+	res, err := api.GetSpotMarketPx("HYPE")
+	if err != nil {
+		t.Errorf("GetSpotMarketPx() error = %v", err)
+	}
+	if res < 0 {
+		t.Errorf("GetSpotMarketPx() = %v, want > %v", res, 0)
+	}
+	t.Logf("GetSpotMarketPx(HYPE) = %v", res)
+}
+
+func TestInfoAPI_GetUserStateSpot(t *testing.T) {
+	api := GetInfoAPI()
+	res, err := api.GetAccountStateSpot()
+	if err != nil {
+		t.Errorf("GetUserStateSpot() error = %v", err)
+	}
+	if len(res.Balances) == 0 {
+		t.Errorf("GetUserStateSpot() = %v, want > %v", res, 0)
+	}
+	t.Logf("GetUserStateSpot() = %+v", res)
 }

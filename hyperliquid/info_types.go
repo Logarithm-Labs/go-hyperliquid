@@ -54,6 +54,25 @@ type Position struct {
 	} `json:"cumFunding"`
 }
 
+type UserStateSpot struct {
+	Balances []SpotAssetPosition `json:"balances"`
+}
+
+type SpotAssetPosition struct {
+	/*
+			 "coin": "USDC",
+		            "token": 0,
+		            "hold": "0.0",
+		            "total": "14.625485",
+		            "entryNtl": "0.0"
+	*/
+	Coin     string  `json:"coin"`
+	Token    int     `json:"token"`
+	Hold     float64 `json:"hold,string"`
+	Total    float64 `json:"total,string"`
+	EntryNtl float64 `json:"entryNtl,string"`
+}
+
 type Order struct {
 	Children         []any   `json:"children,omitempty"`
 	Cloid            string  `json:"cloid,omitempty"`

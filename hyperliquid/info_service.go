@@ -218,6 +218,23 @@ func (api *InfoAPI) GetAccountState() (*UserState, error) {
 	return api.GetUserState(api.AccountAddress())
 }
 
+// Retrieve user's spot account summary
+// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/spot#retrieve-a-users-token-balances
+func (api *InfoAPI) GetUserStateSpot(address string) (*UserStateSpot, error) {
+	request := UserStateRequest{
+		User:  address,
+		Typez: "spotClearinghouseState",
+	}
+	return MakeUniversalRequest[UserStateSpot](api, request)
+}
+
+// Retrieve account's spot account summary
+// The same as GetUserStateSpot but user is set to the account address
+// Check AccountAddress() or SetAccountAddress() if there is a need to set the account address
+func (api *InfoAPI) GetAccountStateSpot() (*UserStateSpot, error) {
+	return api.GetUserStateSpot(api.AccountAddress())
+}
+
 // Retrieve a user's funding history
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals#retrieve-a-users-funding-history-or-non-funding-ledger-updates
 func (api *InfoAPI) GetFundingUpdates(address string, startTime int64, endTime int64) (*[]FundingUpdate, error) {
@@ -269,6 +286,11 @@ func (api *InfoAPI) GetHistoricalFundingRates(coin string, startTime int64, endT
 }
 
 // Helper function to get the market price of a given coin
+// The coin parameter is the name of the coin
+//
+// Example:
+//
+//	api.GetMartketPx("BTC")
 func (api *InfoAPI) GetMartketPx(coin string) (float64, error) {
 	allMids, err := api.GetAllMids()
 	if err != nil {
@@ -282,12 +304,16 @@ func (api *InfoAPI) GetMartketPx(coin string) (float64, error) {
 }
 
 // GetSpotMarketPx returns the market price of a given spot coin
+// The coin parameter is the name of the coin
+//
+// Example:
+//
+//	api.GetSpotMarketPx("HYPE")
 func (api *InfoAPI) GetSpotMarketPx(coin string) (float64, error) {
 	spotPrices, err := api.GetAllSpotPrices()
 	if err != nil {
 		return 0, err
 	}
-
 	spotName := api.spotMeta[coin].SpotName
 	parsed, err := strconv.ParseFloat((*spotPrices)[spotName], 32)
 	if err != nil {
