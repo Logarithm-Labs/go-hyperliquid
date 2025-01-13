@@ -272,6 +272,33 @@ func (api *ExchangeAPI) BulkCancelOrders(cancels []CancelOidWire) (*CancelOrderR
 	return MakeUniversalRequest[CancelOrderResponse](api, request)
 }
 
+// Bulk modify orders
+// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint#modify-multiple-orders
+func (api *ExchangeAPI) BulkModifyOrders(modifyRequests []ModifyOrderRequest) (*PlaceOrderResponse, error) {
+	wires := []ModifyOrderWire{}
+
+	for _, req := range modifyRequests {
+		wires = append(wires, ModifyOrderRequestToWire(req, api.meta))
+	}
+	action := ModifyOrderAction{
+		Type:     "batchModify",
+		Modifies: wires,
+	}
+
+	timestamp := GetNonce()
+	vVal, rVal, sVal, signErr := api.SignL1Action(action, timestamp)
+	if signErr != nil {
+		return nil, signErr
+	}
+	request := ExchangeRequest{
+		Action:       action,
+		Nonce:        timestamp,
+		Signature:    ToTypedSig(rVal, sVal, vVal),
+		VaultAddress: nil,
+	}
+	return MakeUniversalRequest[PlaceOrderResponse](api, request)
+}
+
 // Cancel exact order by OID
 func (api *ExchangeAPI) CancelOrderByOID(coin string, orderID int64) (*CancelOrderResponse, error) {
 	return api.BulkCancelOrders([]CancelOidWire{{Asset: api.meta[coin].AssetId, Oid: int(orderID)}})

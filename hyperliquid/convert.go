@@ -62,6 +62,20 @@ func OrderRequestToWire(req OrderRequest, meta map[string]AssetInfo, isSpot bool
 		OrderType:  OrderTypeToWire(req.OrderType),
 	}
 }
+func ModifyOrderRequestToWire(req ModifyOrderRequest, meta map[string]AssetInfo) ModifyOrderWire {
+	info := meta[req.Coin]
+	return ModifyOrderWire{
+		OrderId: req.OrderId,
+		Order: OrderWire{
+			Asset:      info.AssetId,
+			IsBuy:      req.IsBuy,
+			LimitPx:    FloatToWire(req.LimitPx, nil),
+			SizePx:     FloatToWire(req.Sz, &info.SzDecimals),
+			ReduceOnly: req.ReduceOnly,
+			OrderType:  OrderTypeToWire(req.OrderType),
+		},
+	}
+}
 
 func OrderTypeToWire(orderType OrderType) OrderTypeWire {
 	if orderType.Limit != nil {

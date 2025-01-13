@@ -75,6 +75,29 @@ type OrderWire struct {
 	OrderType  OrderTypeWire `msgpack:"t" json:"t"`
 	Cloid      string        `msgpack:"c,omitempty" json:"c,omitempty"`
 }
+type ModifyResponse struct {
+	Status   string                  `json:"status"`
+	Response PlaceOrderInnerResponse `json:"response"`
+}
+type ModifyOrderWire struct {
+	OrderId int       `msgpack:"oid" json:"oid"`
+	Order   OrderWire `msgpack:"order" json:"order"`
+}
+type ModifyOrderAction struct {
+	Type     string            `msgpack:"type" json:"type"`
+	Modifies []ModifyOrderWire `msgpack:"modifies" json:"modifies"`
+}
+
+type ModifyOrderRequest struct {
+	OrderId    int       `json:"oid"`
+	Coin       string    `json:"coin"`
+	IsBuy      bool      `json:"is_buy"`
+	Sz         float64   `json:"sz"`
+	LimitPx    float64   `json:"limit_px"`
+	OrderType  OrderType `json:"order_type"`
+	ReduceOnly bool      `json:"reduce_only"`
+	Cloid      string    `json:"cloid,omitempty"`
+}
 
 type OrderTypeWire struct {
 	Limit   *LimitOrderType   `json:"limit,omitempty" msgpack:"limit,omitempty"`
