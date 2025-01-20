@@ -10,7 +10,7 @@
 go get github.com/Logarithm-Labs/go-hyperliquid/hyperliquid
 ```
 
-### Documentation
+# Documentation
 
 [![GoDoc](https://godoc.org/github.com/adshao/go-binance?status.svg)](https://pkg.go.dev/github.com/Logarithm-Labs/go-hyperliquid/hyperliquid#section-documentation)
 
