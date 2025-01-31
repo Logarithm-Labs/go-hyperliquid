@@ -1,6 +1,7 @@
 package hyperliquid
 
 import (
+	"log"
 	"math"
 	"os"
 	"testing"
@@ -199,4 +200,60 @@ func TestExchageAPI_TestMarketOrderSpot(testing *testing.T) {
 	if avgPrice == 0 {
 		testing.Errorf("res.Response.Data.Statuses[0].Filled.AvgPx = %v", avgPrice)
 	}
+}
+
+func TestExchangeAPI_TestModifyOrder(t *testing.T) {
+	exchangeAPI := GetExchangeAPI()
+	size := 0.005
+	coin := "ETH"
+	px := 2000.0
+	res, err := exchangeAPI.LimitOrder(TifGtc, coin, size, px, false)
+	if err != nil {
+		t.Errorf("MakeLimit() error = %v", err)
+	}
+	t.Logf("MakeLimit() = %v", res)
+	openOrders, err := exchangeAPI.infoAPI.GetOpenOrders(exchangeAPI.AccountAddress())
+	if err != nil {
+		t.Errorf("GetAccountOpenOrders() error = %v", err)
+	}
+	t.Logf("GetAccountOpenOrders() = %v", openOrders)
+	orderOpened := false
+	for _, order := range *openOrders {
+		if order.Coin == coin && order.Sz == size && order.LimitPx == px {
+			orderOpened = true
+			break
+		}
+	}
+	log.Printf("Order ID: %v", res.Response.Data.Statuses[0].Resting.OrderId)
+	if !orderOpened {
+		t.Errorf("Order not found: %+v", openOrders)
+	}
+	time.Sleep(5 * time.Second) // wait to execute order
+	// modify order
+	newPx := 2500.0
+	orderType := OrderType{
+		Limit: &LimitOrderType{
+			Tif: TifGtc,
+		},
+	}
+	modifyOrderRequest := ModifyOrderRequest{
+		OrderId:    res.Response.Data.Statuses[0].Resting.OrderId,
+		Coin:       coin,
+		Sz:         size,
+		LimitPx:    newPx,
+		OrderType:  orderType,
+		IsBuy:      true,
+		ReduceOnly: false,
+	}
+	modifyRes, err := exchangeAPI.BulkModifyOrders([]ModifyOrderRequest{modifyOrderRequest}, false)
+	if err != nil {
+		t.Errorf("ModifyOrder() error = %v", err)
+	}
+	t.Logf("ModifyOrder() = %+v", modifyRes)
+	time.Sleep(5 * time.Second) // wait to execute order
+	cancelRes, err := exchangeAPI.CancelAllOrders()
+	if err != nil {
+		t.Errorf("CancelAllOrders() error = %v", err)
+	}
+	t.Logf("CancelAllOrders() = %v", cancelRes)
 }
