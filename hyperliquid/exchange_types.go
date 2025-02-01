@@ -146,6 +146,16 @@ type CancelOidWire struct {
 	Oid   int `msgpack:"o" json:"o"`
 }
 
+type CancelCloidWire struct {
+	Asset int    `msgpack:"asset" json:"asset"`
+	Cloid string `msgpack:"cloid" json:"cloid"`
+}
+
+type CancelCloidOrderAction struct {
+	Type    string            `msgpack:"type" json:"type"`
+	Cancels []CancelCloidWire `msgpack:"cancels" json:"cancels"`
+}
+
 type CancelOrderResponse struct {
 	Status   string              `json:"status"`
 	Response InnerCancelResponse `json:"response"`

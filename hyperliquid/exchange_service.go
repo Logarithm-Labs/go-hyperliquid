@@ -19,6 +19,7 @@ type IExchangeAPI interface {
 
 	// Order management
 	CancelOrderByOID(coin string, orderID int) (any, error)
+	CancelOrderByCloid(coin string, clientOID string) (any, error)
 	BulkCancelOrders(cancels []CancelOidWire) (any, error)
 	CancelAllOrdersByCoin(coin string) (any, error)
 	CancelAllOrders() (any, error)
@@ -308,6 +309,33 @@ func (api *ExchangeAPI) BulkModifyOrders(modifyRequests []ModifyOrderRequest, is
 // Cancel exact order by OID
 func (api *ExchangeAPI) CancelOrderByOID(coin string, orderID int64) (*CancelOrderResponse, error) {
 	return api.BulkCancelOrders([]CancelOidWire{{Asset: api.meta[coin].AssetId, Oid: int(orderID)}})
+}
+
+// Cancel exact order by Client Order Id
+// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint#cancel-order-s-by-cloid
+func (api *ExchangeAPI) CancelOrderByCloid(coin string, clientOID string) (*CancelOrderResponse, error) {
+	timestamp := GetNonce()
+	action := CancelCloidOrderAction{
+		Type: "cancelByCloid",
+		Cancels: []CancelCloidWire{
+			{
+				Asset: api.meta[coin].AssetId,
+				Cloid: clientOID,
+			},
+		},
+	}
+	v, r, s, err := api.SignL1Action(action, timestamp)
+	if err != nil {
+		api.debug("Error signing L1 action: %s", err)
+		return nil, err
+	}
+	request := ExchangeRequest{
+		Action:       action,
+		Nonce:        timestamp,
+		Signature:    ToTypedSig(r, s, v),
+		VaultAddress: nil,
+	}
+	return MakeUniversalRequest[CancelOrderResponse](api, request)
 }
 
 // Cancel all orders for a given coin
