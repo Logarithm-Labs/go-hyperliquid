@@ -1,6 +1,6 @@
 package hyperliquid
 
-const GLOBAL_DEBUG = false // Defualt debug that is used in all tests
+const GLOBAL_DEBUG = false // Default debug that is used in all tests
 
 // Execution constants
 const DEFAULT_SLIPPAGE = 0.005 // 0.5% default slippage

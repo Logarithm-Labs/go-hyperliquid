@@ -70,38 +70,46 @@ func TestHyperliquid_MakeSomeTradingLogic(t *testing.T) {
 	}
 	t.Logf("LimitOrder(TifGtc, ETH, -0.01, 5000.1, true): %v", res3)
 
+	res4, err := client.LimitOrder(TifGtc, "ETH", 0.01, 1234.1, false, "0x1234567890abcdef1234567890abcdef")
+	if err != nil {
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+	}
+	t.Logf("LimitOrder(TifIoc, ETH, 0.01, 1234.1, false, 0x1234567890abcdef1234567890abcdef): %v", res4)
+
 	// Get all ordres
-	res4, err := client.GetAccountOpenOrders()
+	res5, err := client.GetAccountOpenOrders()
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
-	t.Logf("GetAccountOpenOrders(): %v", res4)
+	t.Logf("GetAccountOpenOrders(): %v", res5)
 
 	// Close all orders
-	res5, err := client.CancelAllOrders()
+	res6, err := client.CancelAllOrders()
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
-	t.Logf("CancelAllOrders(): %v", res5)
+	t.Logf("CancelAllOrders(): %v", res6)
 
 	// Make market order
-	res6, err := client.MarketOrder("ETH", 0.01, nil)
+	res7, err := client.MarketOrder("ETH", 0.01, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
-	t.Logf("MarketOrder(ETH, 0.01, nil): %v", res6)
+	t.Logf("MarketOrder(ETH, 0.01, nil): %v", res7)
 
 	// Close position
-	res7, err := client.ClosePosition("ETH")
+	res8, err := client.ClosePosition("ETH")
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
-	t.Logf("ClosePosition(ETH): %v", res7)
+	t.Logf("ClosePosition(ETH): %v", res8)
 
 	// Get account balance
-	res8, err := client.GetAccountState()
+	res9, err := client.GetAccountState()
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
-	t.Logf("GetAccountState(): %v", res8)
+	t.Logf("GetAccountState(): %v", res9)
 }

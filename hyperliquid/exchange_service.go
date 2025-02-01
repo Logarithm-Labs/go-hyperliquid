@@ -14,8 +14,8 @@ type IExchangeAPI interface {
 	// Open orders
 	BulkOrders(requests []OrderRequest, grouping Grouping) (*PlaceOrderResponse, error)
 	Order(request OrderRequest, grouping Grouping) (*PlaceOrderResponse, error)
-	MarketOrder(coin string, size float64, slippage *float64) (*PlaceOrderResponse, error)
-	LimitOrder(orderType string, coin string, size float64, px float64, isBuy bool, reduceOnly bool) (*PlaceOrderResponse, error)
+	MarketOrder(coin string, size float64, slippage *float64, clientOID ...string) (*PlaceOrderResponse, error)
+	LimitOrder(orderType string, coin string, size float64, px float64, isBuy bool, reduceOnly bool, clientOID ...string) (*PlaceOrderResponse, error)
 
 	// Order management
 	CancelOrderByOID(coin string, orderID int) (any, error)
@@ -98,7 +98,7 @@ func (api *ExchangeAPI) SlippagePriceSpot(coin string, isBuy bool, slippage floa
 //	MarketOrder("BTC", 0.1, nil) // Buy 0.1 BTC
 //	MarketOrder("BTC", -0.1, nil) // Sell 0.1 BTC
 //	MarketOrder("BTC", 0.1, &slippage) // Buy 0.1 BTC with slippage
-func (api *ExchangeAPI) MarketOrder(coin string, size float64, slippage *float64) (*PlaceOrderResponse, error) {
+func (api *ExchangeAPI) MarketOrder(coin string, size float64, slippage *float64, clientOID ...string) (*PlaceOrderResponse, error) {
 	slpg := GetSlippage(slippage)
 	isBuy := IsBuy(size)
 	finalPx := api.SlippagePrice(coin, isBuy, slpg)
@@ -114,6 +114,9 @@ func (api *ExchangeAPI) MarketOrder(coin string, size float64, slippage *float64
 		LimitPx:    finalPx,
 		OrderType:  orderType,
 		ReduceOnly: false,
+	}
+	if len(clientOID) > 0 {
+		orderRequest.Cloid = clientOID[0]
 	}
 	return api.Order(orderRequest, GroupingNa)
 }
@@ -150,7 +153,7 @@ func (api *ExchangeAPI) MarketOrderSpot(coin string, size float64, slippage *flo
 // Order type can be Gtc, Ioc, Alo.
 // Size determines the amount of the coin to buy/sell.
 // See the constants TifGtc, TifIoc, TifAlo.
-func (api *ExchangeAPI) LimitOrder(orderType string, coin string, size float64, px float64, reduceOnly bool) (*PlaceOrderResponse, error) {
+func (api *ExchangeAPI) LimitOrder(orderType string, coin string, size float64, px float64, reduceOnly bool, clientOID ...string) (*PlaceOrderResponse, error) {
 	// check if the order type is valid
 	if orderType != TifGtc && orderType != TifIoc && orderType != TifAlo {
 		return nil, APIError{Message: fmt.Sprintf("Invalid order type: %s. Available types: %s, %s, %s", orderType, TifGtc, TifIoc, TifAlo)}
@@ -167,6 +170,9 @@ func (api *ExchangeAPI) LimitOrder(orderType string, coin string, size float64, 
 		LimitPx:    px,
 		OrderType:  orderTypeZ,
 		ReduceOnly: reduceOnly,
+	}
+	if len(clientOID) > 0 {
+		orderRequest.Cloid = clientOID[0]
 	}
 	return api.Order(orderRequest, GroupingNa)
 }

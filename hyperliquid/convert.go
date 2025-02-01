@@ -60,6 +60,7 @@ func OrderRequestToWire(req OrderRequest, meta map[string]AssetInfo, isSpot bool
 		SizePx:     FloatToWire(req.Sz, maxDecimals, info.SzDecimals),
 		ReduceOnly: req.ReduceOnly,
 		OrderType:  OrderTypeToWire(req.OrderType),
+		Cloid:      req.Cloid,
 	}
 }
 
