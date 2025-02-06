@@ -3,6 +3,7 @@ package hyperliquid
 import (
 	"crypto/rand"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -55,9 +56,11 @@ func GetSlippage(sl *float64) float64 {
 	return slippage
 }
 
+var nonceCounter = time.Now().UnixMilli()
+
 // Hyperliquid uses timestamps in milliseconds for nonce
 func GetNonce() uint64 {
-	return uint64(time.Now().UnixMilli())
+	return uint64(atomic.AddInt64(&nonceCounter, 1))
 }
 
 // Returns default time range of 90 days
