@@ -7,7 +7,7 @@ import (
 
 func GetHyperliquidAPI() *Hyperliquid {
 	hl := NewHyperliquid(&HyperliquidClientConfig{
-		IsMainnet:      true,
+		IsMainnet:      false,
 		AccountAddress: os.Getenv("TEST_ADDRESS"),
 		PrivateKey:     os.Getenv("TEST_PRIVATE_KEY"),
 	})
@@ -112,4 +112,13 @@ func TestHyperliquid_MakeSomeTradingLogic(t *testing.T) {
 		t.Errorf("Error: %v", err)
 	}
 	t.Logf("GetAccountState(): %v", res9)
+}
+
+func TestHyperliquid_MakeOrder(t *testing.T) {
+	client := GetHyperliquidAPI()
+	order, err := client.MarketOrder("ADA", 15, nil)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	t.Logf("MarketOrder(ADA, 15, nil): %+v", order)
 }
