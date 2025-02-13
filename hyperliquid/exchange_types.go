@@ -11,7 +11,6 @@ type RsvSignature struct {
 	V byte   `json:"v"`
 }
 
-// Base request for /exchange endpoint
 type ExchangeRequest struct {
 	Action       any          `json:"action"`
 	Nonce        uint64       `json:"nonce"`
@@ -22,11 +21,12 @@ type ExchangeRequest struct {
 type AssetInfo struct {
 	SzDecimals  int
 	WeiDecimals int
-	AssetId     int
+	AssetID     int
 	SpotName    string // for spot asset (e.g. "@107")
 }
 
 type OrderRequest struct {
+	OrderID    *int      `json:"order_id"`
 	Coin       string    `json:"coin"`
 	IsBuy      bool      `json:"is_buy"`
 	Sz         float64   `json:"sz"`
@@ -38,7 +38,7 @@ type OrderRequest struct {
 
 type OrderType struct {
 	Limit   *LimitOrderType   `json:"limit,omitempty" msgpack:"limit,omitempty"`
-	Trigger *TriggerOrderType `json:"trigger,omitempty"  msgpack:"trigger,omitempty"`
+	Trigger *TriggerOrderType `json:"trigger,omitempty" msgpack:"trigger,omitempty"`
 }
 
 type LimitOrderType struct {
@@ -85,24 +85,15 @@ type ModifyResponse struct {
 	Status   string             `json:"status"`
 	Response OrderInnerResponse `json:"response"`
 }
+
 type ModifyOrderWire struct {
-	OrderId int       `msgpack:"oid" json:"oid"`
+	OrderID int       `msgpack:"oid" json:"oid"`
 	Order   OrderWire `msgpack:"order" json:"order"`
 }
+
 type ModifyOrderAction struct {
 	Type     string            `msgpack:"type" json:"type"`
 	Modifies []ModifyOrderWire `msgpack:"modifies" json:"modifies"`
-}
-
-type ModifyOrderRequest struct {
-	OrderId    int       `json:"oid"`
-	Coin       string    `json:"coin"`
-	IsBuy      bool      `json:"is_buy"`
-	Sz         float64   `json:"sz"`
-	LimitPx    float64   `json:"limit_px"`
-	OrderType  OrderType `json:"order_type"`
-	ReduceOnly bool      `json:"reduce_only"`
-	Cloid      string    `json:"cloid,omitempty"`
 }
 
 type OrderTypeWire struct {
@@ -160,7 +151,7 @@ func (sr *StatusResponse) UnmarshalJSON(data []byte) error {
 }
 
 type CancelRequest struct {
-	OrderId int `json:"oid"`
+	OrderID int `json:"oid"`
 	Coin    int `json:"coin"`
 }
 
@@ -169,6 +160,10 @@ type CancelOidOrderAction struct {
 	Cancels []CancelOidWire `msgpack:"cancels" json:"cancels"`
 }
 
+type CancelCloidOrderAction struct {
+	Type    string            `msgpack:"type" json:"type"`
+	Cancels []CancelCloidWire `msgpack:"cancels" json:"cancels"`
+}
 type CancelOidWire struct {
 	Asset int `msgpack:"a" json:"a"`
 	Oid   int `msgpack:"o" json:"o"`
@@ -176,17 +171,25 @@ type CancelOidWire struct {
 
 type CancelCloidWire struct {
 	Asset int    `msgpack:"asset" json:"asset"`
-	Cloid string `msgpack:"cloid" json:"cloid"`
+	Cloid string `json:"cloid"`
+}
+type CancelOrderResponse struct {
+	Status   string              `json:"status"`
+	Response InnerCancelResponse `json:"response"`
 }
 
-type CancelCloidOrderAction struct {
-	Type    string            `msgpack:"type" json:"type"`
-	Cancels []CancelCloidWire `msgpack:"cancels" json:"cancels"`
+type InnerCancelResponse struct {
+	Type string                 `json:"type"`
+	Data CancelResponseStatuses `json:"data"`
+}
+
+type CancelResponseStatuses struct {
+	Statuses []StatusResponse `json:"statuses"`
 }
 
 type RestingStatus struct {
-	OrderId int    `json:"oid"`
-	Cloid   string `json:"cloid,omitempty"`
+	OrderID int    `json:"oid"`
+	Cloid   string `json:"cloid"`
 }
 
 type CloseRequest struct {
@@ -198,7 +201,7 @@ type CloseRequest struct {
 }
 
 type FilledStatus struct {
-	OrderId int     `json:"oid"`
+	OrderID int     `json:"oid"`
 	AvgPx   float64 `json:"avgPx,string"`
 	TotalSz float64 `json:"totalSz,string"`
 	Cloid   string  `json:"cloid,omitempty"`
@@ -212,9 +215,9 @@ type Liquidation struct {
 
 type UpdateLeverageAction struct {
 	Type     string `msgpack:"type" json:"type"`
-	Asset    int    `msgpack:"asset" json:"asset"`
-	IsCross  bool   `msgpack:"isCross" json:"isCross"`
-	Leverage int    `msgpack:"leverage" json:"leverage"`
+	Asset    int    `json:"asset"`
+	IsCross  bool   `json:"isCross"`
+	Leverage int    `json:"leverage"`
 }
 
 type DefaultExchangeResponse struct {
@@ -224,7 +227,6 @@ type DefaultExchangeResponse struct {
 	} `json:"response"`
 }
 
-// Depending on Type this struct can has different non-nil fields
 type NonFundingDelta struct {
 	Type   string  `json:"type"`
 	Usdc   float64 `json:"usdc,string,omitempty"`
@@ -257,15 +259,15 @@ type Deposit struct {
 }
 
 type WithdrawAction struct {
-	Type             string `msgpack:"type" json:"type"`
-	Destination      string `msgpack:"destination" json:"destination"`
-	Amount           string `msgpack:"amount" json:"amount"`
-	Time             uint64 `msgpack:"time" json:"time"`
-	HyperliquidChain string `msgpack:"hyperliquidChain" json:"hyperliquidChain"`
-	SignatureChainID string `msgpack:"signatureChainId" json:"signatureChainId"`
+	Type             string `json:"type" msgpack:"type"`
+	Destination      string `json:"destination" msgpack:"destination"`
+	Amount           string `json:"amount" msgpack:"amount"`
+	Time             uint64 `json:"time" msgpack:"time"`
+	HyperliquidChain string `json:"hyperliquidChain" msgpack:"hyperliquidChain"`
+	SignatureChainID string `json:"signatureChainId" msgpack:"signatureChainId"`
 }
 
 type WithdrawResponse struct {
 	Status string `json:"status"`
-	Nonce  int64
+	Nonce  int64  `json:"nonce"`
 }

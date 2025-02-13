@@ -3,6 +3,7 @@ package hyperliquid
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 )
 
@@ -35,6 +36,7 @@ type IInfoAPI interface {
 	BuildMetaMap() (map[string]AssetInfo, error)
 	GetWithdrawals(address string) (*[]Withdrawal, error)
 	GetAccountWithdrawals() (*[]Withdrawal, error)
+	GetUserRole() (*UserRole, error)
 }
 
 type InfoAPI struct {
@@ -60,6 +62,7 @@ func NewInfoAPI(isMainnet bool) *InfoAPI {
 	return &api
 }
 
+// Endpoint returns the base endpoint for the InfoAPI.
 func (api *InfoAPI) Endpoint() string {
 	return api.baseEndpoint
 }
@@ -68,7 +71,7 @@ func (api *InfoAPI) Endpoint() string {
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint#retrieve-mids-for-all-actively-traded-coins
 func (api *InfoAPI) GetAllMids() (*map[string]string, error) {
 	request := InfoRequest{
-		Typez: "allMids",
+		Type: "allMids",
 	}
 	return MakeUniversalRequest[map[string]string](api, request)
 }
@@ -77,7 +80,7 @@ func (api *InfoAPI) GetAllMids() (*map[string]string, error) {
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/spot#retrieve-spot-asset-contexts
 func (api *InfoAPI) GetAllSpotPrices() (*map[string]string, error) {
 	request := InfoRequest{
-		Typez: "spotMetaAndAssetCtxs",
+		Type: "spotMetaAndAssetCtxs",
 	}
 	response, err := MakeUniversalRequest[SpotMetaAndAssetCtxsResponse](api, request)
 	if err != nil {
@@ -112,8 +115,8 @@ func (api *InfoAPI) GetAllSpotPrices() (*map[string]string, error) {
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint#retrieve-a-users-open-orders
 func (api *InfoAPI) GetOpenOrders(address string) (*[]Order, error) {
 	request := InfoRequest{
-		User:  address,
-		Typez: "openOrders",
+		User: address,
+		Type: "openOrders",
 	}
 	return MakeUniversalRequest[[]Order](api, request)
 }
@@ -129,8 +132,8 @@ func (api *InfoAPI) GetAccountOpenOrders() (*[]Order, error) {
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint#retrieve-a-users-fills
 func (api *InfoAPI) GetUserFills(address string) (*[]OrderFill, error) {
 	request := InfoRequest{
-		User:  address,
-		Typez: "userFills",
+		User: address,
+		Type: "userFills",
 	}
 	return MakeUniversalRequest[[]OrderFill](api, request)
 }
@@ -146,8 +149,8 @@ func (api *InfoAPI) GetAccountFills() (*[]OrderFill, error) {
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint#query-user-rate-limits
 func (api *InfoAPI) GetUserRateLimits(address string) (*RatesLimits, error) {
 	request := InfoRequest{
-		User:  address,
-		Typez: "userRateLimit",
+		User: address,
+		Type: "userRateLimit",
 	}
 	return MakeUniversalRequest[RatesLimits](api, request)
 }
@@ -163,8 +166,8 @@ func (api *InfoAPI) GetAccountRateLimits() (*RatesLimits, error) {
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint#l2-book-snapshot
 func (api *InfoAPI) GetL2BookSnapshot(coin string) (*L2BookSnapshot, error) {
 	request := InfoRequest{
-		Typez: "l2Book",
-		Coin:  coin,
+		Type: "l2Book",
+		Coin: coin,
 	}
 	return MakeUniversalRequest[L2BookSnapshot](api, request)
 }
@@ -173,7 +176,7 @@ func (api *InfoAPI) GetL2BookSnapshot(coin string) (*L2BookSnapshot, error) {
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint#candle-snapshot
 func (api *InfoAPI) GetCandleSnapshot(coin string, interval string, startTime int64, endTime int64) (*[]CandleSnapshot, error) {
 	request := CandleSnapshotRequest{
-		Typez: "candleSnapshot",
+		Type: "candleSnapshot",
 		Req: CandleSnapshotSubRequest{
 			Coin:      coin,
 			Interval:  interval,
@@ -188,7 +191,7 @@ func (api *InfoAPI) GetCandleSnapshot(coin string, interval string, startTime in
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals#retrieve-perpetuals-metadata
 func (api *InfoAPI) GetMeta() (*Meta, error) {
 	request := InfoRequest{
-		Typez: "meta",
+		Type: "meta",
 	}
 	return MakeUniversalRequest[Meta](api, request)
 }
@@ -196,7 +199,7 @@ func (api *InfoAPI) GetMeta() (*Meta, error) {
 // Retrieve spot metadata
 func (api *InfoAPI) GetSpotMeta() (*SpotMeta, error) {
 	request := InfoRequest{
-		Typez: "spotMeta",
+		Type: "spotMeta",
 	}
 	return MakeUniversalRequest[SpotMeta](api, request)
 }
@@ -205,25 +208,25 @@ func (api *InfoAPI) GetSpotMeta() (*SpotMeta, error) {
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals#retrieve-users-perpetuals-account-summary
 func (api *InfoAPI) GetUserState(address string) (*UserState, error) {
 	request := UserStateRequest{
-		User:  address,
-		Typez: "clearinghouseState",
+		User: address,
+		Type: "clearinghouseState",
 	}
 	return MakeUniversalRequest[UserState](api, request)
 }
 
-// Retrieve account's perpetuals account summary
+// GetAccountState retrieve account's perpetuals account summary
 // The same as GetUserState but user is set to the account address
 // Check AccountAddress() or SetAccountAddress() if there is a need to set the account address
 func (api *InfoAPI) GetAccountState() (*UserState, error) {
 	return api.GetUserState(api.AccountAddress())
 }
 
-// Retrieve user's spot account summary
+// GetUserStateSpot retrieve's a user's spot account summary
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/spot#retrieve-a-users-token-balances
 func (api *InfoAPI) GetUserStateSpot(address string) (*UserStateSpot, error) {
 	request := UserStateRequest{
-		User:  address,
-		Typez: "spotClearinghouseState",
+		User: address,
+		Type: "spotClearinghouseState",
 	}
 	return MakeUniversalRequest[UserStateSpot](api, request)
 }
@@ -235,21 +238,23 @@ func (api *InfoAPI) GetAccountStateSpot() (*UserStateSpot, error) {
 	return api.GetUserStateSpot(api.AccountAddress())
 }
 
-// Retrieve a user's funding history
-// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals#retrieve-a-users-funding-history-or-non-funding-ledger-updates
+// GetFundingUpdates retrieves user's funding history between startTime and endTime (Unix timestamps).
+// Returns chronological funding payments for perpetual positions. See API docs for details.
+// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals#retrieve-funding-updates
 func (api *InfoAPI) GetFundingUpdates(address string, startTime int64, endTime int64) (*[]FundingUpdate, error) {
 	request := InfoRequest{
 		User:      address,
-		Typez:     "userFunding",
+		Type:      "userFunding",
 		StartTime: startTime,
 		EndTime:   endTime,
 	}
 	return MakeUniversalRequest[[]FundingUpdate](api, request)
 }
 
-// Retrieve account's funding history
+// GetAccountFundingUpdates retrieve's an account's funding history
 // The same as GetFundingUpdates but user is set to the account address
 // Check AccountAddress() or SetAccountAddress() if there is a need to set the account address
+// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals#retrieve-a-users-funding-history-or-non-funding-ledger-updates
 func (api *InfoAPI) GetAccountFundingUpdates(startTime int64, endTime int64) (*[]FundingUpdate, error) {
 	return api.GetFundingUpdates(api.AccountAddress(), startTime, endTime)
 }
@@ -259,7 +264,7 @@ func (api *InfoAPI) GetAccountFundingUpdates(startTime int64, endTime int64) (*[
 func (api *InfoAPI) GetNonFundingUpdates(address string, startTime int64, endTime int64) (*[]NonFundingUpdate, error) {
 	request := InfoRequest{
 		User:      address,
-		Typez:     "userNonFundingLedgerUpdates",
+		Type:      "userNonFundingLedgerUpdates",
 		StartTime: startTime,
 		EndTime:   endTime,
 	}
@@ -273,11 +278,21 @@ func (api *InfoAPI) GetAccountNonFundingUpdates(startTime int64, endTime int64) 
 	return api.GetNonFundingUpdates(api.AccountAddress(), startTime, endTime)
 }
 
+// Retrieve a user's role ("missing", "user", "agent", "vault", or "subAccount")
+// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint#query-a-users-role
+func (api *InfoAPI) GetUserRole(address string) (*UserRoleResponse, error) {
+	request := InfoRequest{
+		User: address,
+		Type: "userRole",
+	}
+	return MakeUniversalRequest[UserRoleResponse](api, request)
+}
+
 // Retrieve historical funding rates
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals#retrieve-historical-funding-rates
 func (api *InfoAPI) GetHistoricalFundingRates(coin string, startTime int64, endTime int64) (*[]HistoricalFundingRate, error) {
 	request := InfoRequest{
-		Typez:     "fundingHistory",
+		Type:      "fundingHistory",
 		Coin:      coin,
 		StartTime: startTime,
 		EndTime:   endTime,
@@ -297,25 +312,6 @@ func (api *InfoAPI) GetMartketPx(coin string) (float64, error) {
 		return 0, err
 	}
 	parsed, err := strconv.ParseFloat((*allMids)[coin], 32)
-	if err != nil {
-		return 0, err
-	}
-	return parsed, nil
-}
-
-// GetSpotMarketPx returns the market price of a given spot coin
-// The coin parameter is the name of the coin
-//
-// Example:
-//
-//	api.GetSpotMarketPx("HYPE")
-func (api *InfoAPI) GetSpotMarketPx(coin string) (float64, error) {
-	spotPrices, err := api.GetAllSpotPrices()
-	if err != nil {
-		return 0, err
-	}
-	spotName := api.spotMeta[coin].SpotName
-	parsed, err := strconv.ParseFloat((*spotPrices)[spotName], 32)
 	if err != nil {
 		return 0, err
 	}
@@ -388,12 +384,18 @@ func (api *InfoAPI) BuildMetaMap() (map[string]AssetInfo, error) {
 	metaMap := make(map[string]AssetInfo)
 	result, err := api.GetMeta()
 	if err != nil {
-		return nil, err
+		log.Fatalf("Failed to get meta: %v", err)
 	}
 	for index, asset := range result.Universe {
+		if asset.Name == "BTC" {
+			metaMap["BTC"] = AssetInfo{
+				SzDecimals: asset.SzDecimals,
+				AssetID:    index,
+			}
+		}
 		metaMap[asset.Name] = AssetInfo{
 			SzDecimals: asset.SzDecimals,
-			AssetId:    index,
+			AssetID:    index,
 		}
 	}
 	return metaMap, nil
@@ -431,7 +433,7 @@ func (api *InfoAPI) BuildSpotMetaMap() (map[string]AssetInfo, error) {
 				metaMap[token.name] = AssetInfo{
 					SzDecimals:  token.szDecimals,
 					WeiDecimals: token.weiDecimals,
-					AssetId:     universe.Index,
+					AssetID:     universe.Index,
 					SpotName:    universe.Name,
 				}
 			}

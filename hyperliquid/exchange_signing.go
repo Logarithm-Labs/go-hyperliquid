@@ -34,7 +34,7 @@ func (api *ExchangeAPI) SignUserSignableAction(action any, payloadTypes []apityp
 }
 
 func (api *ExchangeAPI) SignL1Action(action any, timestamp uint64) (byte, [32]byte, [32]byte, error) {
-	srequest, err := api.BuildEIP712Message(action, timestamp)
+	srequest, err := api.BuildEIP712Message(action, timestamp, api.VaultAddress())
 	if err != nil {
 		api.debug("Error building EIP712 message: %s", err)
 		return 0, [32]byte{}, [32]byte{}, err
@@ -42,8 +42,8 @@ func (api *ExchangeAPI) SignL1Action(action any, timestamp uint64) (byte, [32]by
 	return api.Sign(srequest)
 }
 
-func (api *ExchangeAPI) BuildEIP712Message(action any, timestamp uint64) (*SignRequest, error) {
-	hash, err := buildActionHash(action, "", timestamp)
+func (api *ExchangeAPI) BuildEIP712Message(action any, timestamp uint64, vaultAddress string) (*SignRequest, error) {
+	hash, err := buildActionHash(action, vaultAddress, timestamp)
 	if err != nil {
 		return nil, err
 	}

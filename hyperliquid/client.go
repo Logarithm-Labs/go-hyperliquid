@@ -22,7 +22,10 @@ type IClient interface {
 	IAPIService
 	SetPrivateKey(privateKey string) error
 	SetAccountAddress(address string)
+	SetVaultAddress(address string)
+	SetUserRole(role Role)
 	AccountAddress() string
+	VaultAddress() string
 	SetDebugActive()
 	IsMainnet() bool
 }
@@ -33,14 +36,16 @@ type IClient interface {
 // the network type, the private key, and the logger.
 // The debug method prints the debug messages.
 type Client struct {
-	baseUrl        string       // Base URL of the HyperLiquid API
+	baseURL        string       // Base URL of the HyperLiquid API
 	privateKey     string       // Private key for the client
-	defualtAddress string       // Default address for the client
+	defaultAddress string       // Default address for the client
 	isMainnet      bool         // Network type
 	Debug          bool         // Debug mode
 	httpClient     *http.Client // HTTP client
 	keyManager     *PKeyManager // Private key manager
 	Logger         *log.Logger  // Logger for debug messages
+	role           Role         // Role of the client,
+	vaultAddress   string       // Vault address
 }
 
 // Returns the private key manager connected to the API.
@@ -60,19 +65,21 @@ func getURL(isMainnet bool) string {
 // NewClient returns a new instance of the Client struct.
 func NewClient(isMainnet bool) *Client {
 	logger := log.New()
+	logger.SetLevel(log.DebugLevel)
 	logger.SetFormatter(&log.TextFormatter{
 		FullTimestamp: true,
 		PadLevelText:  true,
+		ForceColors:   true,
 	})
 	logger.SetOutput(os.Stdout)
 	logger.SetLevel(log.DebugLevel)
 	return &Client{
-		baseUrl:        getURL(isMainnet),
+		baseURL:        getURL(isMainnet),
 		httpClient:     http.DefaultClient,
 		Debug:          false,
 		isMainnet:      isMainnet,
 		privateKey:     "",
-		defualtAddress: "",
+		defaultAddress: "",
 		Logger:         logger,
 		keyManager:     nil,
 	}
@@ -100,12 +107,30 @@ func (client *Client) SetPrivateKey(privateKey string) error {
 // In case you use PKeyManager from API section https://app.hyperliquid.xyz/API
 // Then you can use this method to set the address.
 func (client *Client) SetAccountAddress(address string) {
-	client.defualtAddress = address
+	client.defaultAddress = address
 }
 
 // Returns the public address connected to the API.
 func (client *Client) AccountAddress() string {
-	return client.defualtAddress
+	return client.defaultAddress
+}
+
+// VaultAddress returns the vault address for the client.
+func (client *Client) VaultAddress() string {
+	return client.vaultAddress
+}
+
+// SetVaultAddress sets the vault address for the client.
+func (client *Client) SetVaultAddress(vaultAddress string) {
+	client.vaultAddress = vaultAddress
+}
+
+// SetUserRole sets the user role for the client.
+func (client *Client) SetUserRole(role Role) {
+	client.role = role
+	if role.IsVaultOrSubAccount() {
+		client.vaultAddress = client.AccountAddress()
+	}
 }
 
 // IsMainnet returns true if the client is connected to the mainnet.
@@ -121,7 +146,7 @@ func (client *Client) SetDebugActive() {
 // Request sends a POST request to the HyperLiquid API.
 func (client *Client) Request(endpoint string, payload any) ([]byte, error) {
 	endpoint = strings.TrimPrefix(endpoint, "/") // Remove leading slash if present
-	url := fmt.Sprintf("%s/%s", client.baseUrl, endpoint)
+	url := fmt.Sprintf("%s/%s", client.baseURL, endpoint)
 	client.debug("Request to %s", url)
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
