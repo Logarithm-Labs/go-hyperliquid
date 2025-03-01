@@ -13,8 +13,30 @@ import (
 var nonceCounter = time.Now().UnixMilli()
 
 // Hyperliquid uses timestamps in milliseconds for nonce
+// GetNonce returns a unique nonce that is always at least the current time in milliseconds.
+// It ensures thread-safe updates using atomic operations.
 func GetNonce() uint64 {
-	return uint64(atomic.AddInt64(&nonceCounter, 1))
+	now := time.Now().UnixMilli()
+	for {
+		// Load the current nonce value atomically.
+		current := atomic.LoadInt64(&nonceCounter)
+
+		// If the current time is greater than the stored nonce,
+		// attempt to update the nonce to the current time.
+		if current < now {
+			if atomic.CompareAndSwapInt64(&nonceCounter, current, now) {
+				return uint64(now)
+			}
+			// If the swap fails, retry.
+			continue
+		}
+
+		// Otherwise, increment the nonce by one.
+		newNonce := current + 1
+		if atomic.CompareAndSwapInt64(&nonceCounter, current, newNonce) {
+			return uint64(newNonce)
+		}
+	}
 }
 
 // Retruns a random cloid (Client Order ID)
