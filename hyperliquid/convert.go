@@ -34,6 +34,21 @@ func HexToBytes(addr string) []byte {
 		return b
 	}
 }
+func HexToInt(hexString string) (*big.Int, error) {
+	value := new(big.Int)
+	if len(hexString) > 1 && hexString[:2] == "0x" {
+		hexString = hexString[2:]
+	}
+	_, success := value.SetString(hexString, 16)
+	if !success {
+		return nil, fmt.Errorf("invalid hexadecimal string: %s", hexString)
+	}
+	return value, nil
+}
+
+func IntToHex(value *big.Int) string {
+	return "0x" + value.Text(16)
+}
 
 func OrderWiresToOrderAction(orders []OrderWire, grouping Grouping) PlaceOrderAction {
 	return PlaceOrderAction{
@@ -43,19 +58,35 @@ func OrderWiresToOrderAction(orders []OrderWire, grouping Grouping) PlaceOrderAc
 	}
 }
 
-func OrderRequestToWire(req OrderRequest, meta map[string]AssetInfo, isSpot bool) OrderWire {
+func (req *OrderRequest) isSpot() bool {
+	return strings.ContainsAny(req.Coin, "@-")
+}
+
+// ToWire (OrderRequest) converts an OrderRequest to an OrderWire using the provided metadata.
+// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/asset-ids
+func (req *OrderRequest) ToWireMeta(meta map[string]AssetInfo) OrderWire {
 	info := meta[req.Coin]
-	var assetId, maxDecimals int
-	if isSpot {
-		// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/asset-ids
-		assetId = info.AssetId + 10000
+	return req.ToWire(info)
+}
+
+// ToModifyWire converts an OrderRequest to a ModifyOrderWire using the provided AssetInfo.
+func (req *OrderRequest) ToModifyWire(info AssetInfo) ModifyOrderWire {
+	return ModifyOrderWire{
+		OrderID: *req.OrderID,
+		Order:   req.ToWire(info),
+	}
+}
+
+// ToWire converts an OrderRequest to an OrderWire using the provided AssetInfo.
+func (req *OrderRequest) ToWire(info AssetInfo) OrderWire {
+	var assetID = info.AssetID
+	var maxDecimals = PERP_MAX_DECIMALS
+	if req.isSpot() {
+		assetID = info.AssetID + 10000 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/asset-ids
 		maxDecimals = SPOT_MAX_DECIMALS
-	} else {
-		assetId = info.AssetId
-		maxDecimals = PERP_MAX_DECIMALS
 	}
 	return OrderWire{
-		Asset:      assetId,
+		Asset:      assetID,
 		IsBuy:      req.IsBuy,
 		LimitPx:    PriceToWire(req.LimitPx, maxDecimals, info.SzDecimals),
 		SizePx:     SizeToWire(req.Sz, info.SzDecimals),
@@ -65,30 +96,7 @@ func OrderRequestToWire(req OrderRequest, meta map[string]AssetInfo, isSpot bool
 	}
 }
 
-func ModifyOrderRequestToWire(req ModifyOrderRequest, meta map[string]AssetInfo, isSpot bool) ModifyOrderWire {
-	info := meta[req.Coin]
-	var assetId, maxDecimals int
-	if isSpot {
-		// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/asset-ids
-		assetId = info.AssetId + 10000
-		maxDecimals = SPOT_MAX_DECIMALS
-	} else {
-		assetId = info.AssetId
-		maxDecimals = PERP_MAX_DECIMALS
-	}
-	return ModifyOrderWire{
-		OrderId: req.OrderId,
-		Order: OrderWire{
-			Asset:      assetId,
-			IsBuy:      req.IsBuy,
-			LimitPx:    PriceToWire(req.LimitPx, maxDecimals, info.SzDecimals),
-			SizePx:     SizeToWire(req.Sz, info.SzDecimals),
-			ReduceOnly: req.ReduceOnly,
-			OrderType:  OrderTypeToWire(req.OrderType),
-		},
-	}
-}
-
+// OrderTypeToWire converts an OrderType to an OrderTypeWire.
 func OrderTypeToWire(orderType OrderType) OrderTypeWire {
 	if orderType.Limit != nil {
 		return OrderTypeWire{
@@ -110,8 +118,26 @@ func OrderTypeToWire(orderType OrderType) OrderTypeWire {
 	return OrderTypeWire{}
 }
 
-// Format the float with custom decimal places, default is 6 (perp), 8 (spot).
-// https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/tick-and-lot-size
+/**
+ * FloatToWire converts a float64 to a string representation following Hyperliquid's decimal rules.
+ * FloatToWire converts a float64 to a string representation following Hyperliquid's decimal rules.
+ *
+ * The conversion adheres to market-specific decimal place constraints:
+ * - Perpetual markets: Maximum 6 decimal places
+ * - Spot markets: Maximum 8 decimal places
+ *
+ * The function dynamically adjusts decimal precision based on:
+ * 1. Integer part magnitude
+ * 2. Maximum allowed decimals (maxDecimals)
+ * 3. Size decimal precision (szDecimals)
+ *
+ * Output formatting:
+ * - Removes trailing zeros
+ * - Trims unnecessary decimal points
+ * - Maintains tick size precision requirements
+ *
+ * @see https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/tick-and-lot-size
+ */
 func FloatToWire(x float64, maxDecimals int, szDecimals int) string {
 	bigf := big.NewFloat(x)
 	var maxDecSz uint
@@ -227,4 +253,39 @@ func StructToMap(strct any) (res map[string]interface{}, err error) {
 	}
 	json.Unmarshal(a, &res)
 	return res, nil
+}
+
+// RoundOrderSize rounds the order size to the nearest tick size
+func RoundOrderSize(x float64, szDecimals int) string {
+	newX := math.Round(x*math.Pow10(szDecimals)) / math.Pow10(szDecimals)
+	// TODO: add rounding
+	return big.NewFloat(newX).Text('f', szDecimals)
+}
+
+// RoundOrderPrice rounds the order price to the nearest tick size
+func RoundOrderPrice(x float64, szDecimals int, maxDecimals int) string {
+	maxSignFigures := 5
+	allowedDecimals := maxDecimals - szDecimals
+	numberOfDigitsInIntegerPart := len(strconv.Itoa(int(x)))
+	if numberOfDigitsInIntegerPart >= maxSignFigures {
+		return RoundOrderSize(x, 0)
+	}
+	allowedSignFigures := maxSignFigures - numberOfDigitsInIntegerPart
+	if x >= 1 {
+		return RoundOrderSize(x, min(allowedSignFigures, allowedDecimals))
+	}
+
+	text := RoundOrderSize(x, allowedDecimals)
+	startSignFigures := false
+	for i := 2; i < len(text); i++ {
+		if text[i] == '0' && !startSignFigures {
+			continue
+		}
+		startSignFigures = true
+		allowedSignFigures--
+		if allowedSignFigures == 0 {
+			return text[:i+1]
+		}
+	}
+	return text
 }

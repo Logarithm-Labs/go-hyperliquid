@@ -3,7 +3,7 @@ package hyperliquid
 // Base request for /info
 type InfoRequest struct {
 	User      string `json:"user,omitempty"`
-	Typez     string `json:"type"`
+	Type      string `json:"type"`
 	Oid       string `json:"oid,omitempty"`
 	Coin      string `json:"coin,omitempty"`
 	StartTime int64  `json:"startTime,omitempty"`
@@ -11,10 +11,35 @@ type InfoRequest struct {
 }
 
 type UserStateRequest struct {
-	User  string `json:"user"`
-	Typez string `json:"type"`
+	User string `json:"user"`
+	Type string `json:"type"`
 }
 
+type Role string
+
+const (
+	RoleUser       Role = "user"
+	RoleAgent      Role = "agent"
+	RoleVault      Role = "vault"
+	RoleSubAccount Role = "subAccount"
+	RoleMissing    Role = "missing"
+)
+
+// UserRole represents a user role.
+// Role can be one of "user", "agent", "vault",  "subAccount" or "missing"
+type UserRole struct {
+	Role Role `json:"role"`
+	Data struct {
+		Master string `json:"master,omitempty"`
+	} `json:"data,omitempty"`
+}
+
+// IsVaultOrSubAccount checks if the role is either Vault or SubAccount.
+func (r Role) IsVaultOrSubAccount() bool {
+	return r == RoleVault || r == RoleSubAccount
+}
+
+// Asset represents an asset.
 type Asset struct {
 	Name         string `json:"name"`
 	SzDecimals   int    `json:"szDecimals"`
@@ -29,6 +54,10 @@ type UserState struct {
 	CrossMarginSummary         MarginSummary   `json:"crossMarginSummary"`
 	MarginSummary              MarginSummary   `json:"marginSummary"`
 	Time                       int64           `json:"time"`
+}
+
+type UserRoleResponse struct {
+	UserRole UserRole `json:"userRole"`
 }
 
 type AssetPosition struct {
@@ -53,19 +82,14 @@ type Position struct {
 		SinceChan float64 `json:"sinceChange,string"`
 	} `json:"cumFunding"`
 }
-
 type UserStateSpot struct {
 	Balances []SpotAssetPosition `json:"balances"`
 }
 
+// SpotAssetPosition represents an asset position.
+//
+//	SpotAssetPosition{"coin": "USDC", "token": 0, "hold": "0.0", "total": "14.625485", "entryNtl": "0.0"}
 type SpotAssetPosition struct {
-	/*
-			 "coin": "USDC",
-		            "token": 0,
-		            "hold": "0.0",
-		            "total": "14.625485",
-		            "entryNtl": "0.0"
-	*/
 	Coin     string  `json:"coin"`
 	Token    int     `json:"token"`
 	Hold     float64 `json:"hold,string"`
@@ -183,8 +207,8 @@ type CandleSnapshotSubRequest struct {
 }
 
 type CandleSnapshotRequest struct {
-	Typez string                   `json:"type"`
-	Req   CandleSnapshotSubRequest `json:"req"`
+	Type string                   `json:"type"`
+	Req  CandleSnapshotSubRequest `json:"req"`
 }
 
 type CandleSnapshot struct {

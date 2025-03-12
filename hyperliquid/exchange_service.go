@@ -3,6 +3,8 @@ package hyperliquid
 import (
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
@@ -14,13 +16,15 @@ type IExchangeAPI interface {
 	// Open orders
 	BulkOrders(requests []OrderRequest, grouping Grouping) (*OrderResponse, error)
 	Order(request OrderRequest, grouping Grouping) (*OrderResponse, error)
-	MarketOrder(coin string, size float64, slippage *float64, clientOID ...string) (*OrderResponse, error)
-	LimitOrder(orderType string, coin string, size float64, px float64, isBuy bool, reduceOnly bool, clientOID ...string) (*OrderResponse, error)
+	MarketOrder(coin string, size float64, slippage *float64) (*OrderResponse, error)
+	LimitOrder(orderType string, coin string, size float64, px float64, isBuy bool, reduceOnly bool) (*OrderResponse, error)
 
 	// Order management
 	CancelOrderByOID(coin string, orderID int) (any, error)
-	CancelOrderByCloid(coin string, clientOID string) (any, error)
+	CancelOrderByCloid(symbol string, clientOrderID string) (*OrderResponse, error)
 	BulkCancelOrders(cancels []CancelOidWire) (any, error)
+	BulkCancelOrdersByCloid(entries []CancelCloidWire) (*OrderResponse, error)
+
 	CancelAllOrdersByCoin(coin string) (any, error)
 	CancelAllOrders() (any, error)
 	ClosePosition(coin string) (*OrderResponse, error)
@@ -38,6 +42,7 @@ type ExchangeAPI struct {
 	baseEndpoint string
 	meta         map[string]AssetInfo
 	spotMeta     map[string]AssetInfo
+	role         string
 }
 
 // NewExchangeAPI creates a new default ExchangeAPI.
@@ -63,16 +68,7 @@ func NewExchangeAPI(isMainnet bool) *ExchangeAPI {
 		api.debug("Error building spot meta map: %s", err)
 	}
 	api.spotMeta = spotMeta
-
 	return &api
-}
-
-//
-// Helpers
-//
-
-func (api *ExchangeAPI) Endpoint() string {
-	return api.baseEndpoint
 }
 
 // Helper function to calculate the slippage price based on the market price.
@@ -108,11 +104,12 @@ func (api *ExchangeAPI) getChainParams() (string, string) {
 func (api *ExchangeAPI) BuildBulkOrdersEIP712(requests []OrderRequest, grouping Grouping) (apitypes.TypedData, error) {
 	var wires []OrderWire
 	for _, req := range requests {
-		wires = append(wires, OrderRequestToWire(req, api.meta, false))
+		meta := api.GetMeta(req)
+		wires = append(wires, req.ToWire(meta))
 	}
 	timestamp := GetNonce()
 	action := OrderWiresToOrderAction(wires, grouping)
-	srequest, err := api.BuildEIP712Message(action, timestamp)
+	srequest, err := api.BuildEIP712Message(action, timestamp, api.VaultAddress())
 	if err != nil {
 		api.debug("Error building EIP712 message: %s", err)
 		return apitypes.TypedData{}, err
@@ -131,16 +128,12 @@ func (api *ExchangeAPI) BuildOrderEIP712(request OrderRequest, grouping Grouping
 
 // Place orders in bulk
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint#place-an-order
-func (api *ExchangeAPI) BulkOrders(requests []OrderRequest, grouping Grouping, isSpot bool) (*OrderResponse, error) {
+func (api *ExchangeAPI) BulkOrders(requests []OrderRequest, grouping Grouping) (*OrderResponse, error) {
 	var wires []OrderWire
-	var meta map[string]AssetInfo
-	if isSpot {
-		meta = api.spotMeta
-	} else {
-		meta = api.meta
-	}
+	var meta AssetInfo
 	for _, req := range requests {
-		wires = append(wires, OrderRequestToWire(req, meta, isSpot))
+		meta = api.GetMeta(req)
+		wires = append(wires, req.ToWire(meta))
 	}
 	timestamp := GetNonce()
 	action := OrderWiresToOrderAction(wires, grouping)
@@ -182,11 +175,12 @@ func (api *ExchangeAPI) BulkCancelOrders(cancels []CancelOidWire) (*OrderRespons
 
 // Bulk modify orders
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint#modify-multiple-orders
-func (api *ExchangeAPI) BulkModifyOrders(modifyRequests []ModifyOrderRequest, isSpot bool) (*OrderResponse, error) {
+func (api *ExchangeAPI) BulkModifyOrders(modifyRequests []OrderRequest) (*OrderResponse, error) {
 	wires := []ModifyOrderWire{}
 
 	for _, req := range modifyRequests {
-		wires = append(wires, ModifyOrderRequestToWire(req, api.meta, isSpot))
+		info := api.GetMeta(req)
+		wires = append(wires, req.ToModifyWire(info))
 	}
 	action := ModifyOrderAction{
 		Type:     "batchModify",
@@ -215,7 +209,7 @@ func (api *ExchangeAPI) CancelOrderByCloid(coin string, clientOID string) (*Orde
 		Type: "cancelByCloid",
 		Cancels: []CancelCloidWire{
 			{
-				Asset: api.meta[coin].AssetId,
+				Asset: api.meta[coin].AssetID,
 				Cloid: clientOID,
 			},
 		},
@@ -240,7 +234,7 @@ func (api *ExchangeAPI) UpdateLeverage(coin string, isCross bool, leverage int) 
 	timestamp := GetNonce()
 	action := UpdateLeverageAction{
 		Type:     "updateLeverage",
-		Asset:    api.meta[coin].AssetId,
+		Asset:    api.meta[coin].AssetID,
 		IsCross:  isCross,
 		Leverage: leverage,
 	}
@@ -291,10 +285,34 @@ func (api *ExchangeAPI) Withdraw(destination string, amount float64) (*WithdrawR
 
 // Place single order
 func (api *ExchangeAPI) Order(request OrderRequest, grouping Grouping) (*OrderResponse, error) {
-	return api.BulkOrders([]OrderRequest{request}, grouping, false)
+	return api.BulkOrders([]OrderRequest{request}, grouping)
 }
 
-// Open a market order.
+// Endpoint returns the base endpoint for the /exchange service.
+func (api *ExchangeAPI) Endpoint() string {
+	return api.baseEndpoint
+}
+
+// GetSpotMarketPx returns the market price of a given spot coin
+// The coin parameter is the name of the coin
+//
+// Example:
+//
+//	api.GetSpotMarketPx("HYPE")
+func (api *InfoAPI) GetSpotMarketPx(coin string) (float64, error) {
+	spotPrices, err := api.GetAllSpotPrices()
+	if err != nil {
+		return 0, err
+	}
+	spotName := api.spotMeta[coin].SpotName
+	parsed, err := strconv.ParseFloat((*spotPrices)[spotName], 32)
+	if err != nil {
+		return 0, err
+	}
+	return parsed, nil
+}
+
+// MarketOrder places a market order.
 // Limit order with TIF=IOC and px=market price * (1 +- slippage).
 // Size determines the amount of the coin to buy/sell.
 //
@@ -352,11 +370,10 @@ func (api *ExchangeAPI) MarketOrderSpot(coin string, size float64, slippage *flo
 	return api.OrderSpot(orderRequest, GroupingNa)
 }
 
-// Open a limit order.
-// Order type can be Gtc, Ioc, Alo.
+// LimitOrder places a limit order
 // Size determines the amount of the coin to buy/sell.
 // See the constants TifGtc, TifIoc, TifAlo.
-func (api *ExchangeAPI) LimitOrder(orderType string, coin string, size float64, px float64, reduceOnly bool, clientOID ...string) (*OrderResponse, error) {
+func (api *ExchangeAPI) LimitOrder(orderType string, coin string, size float64, px float64, reduceOnly bool, cloid ...string) (*OrderResponse, error) {
 	// check if the order type is valid
 	if orderType != TifGtc && orderType != TifIoc && orderType != TifAlo {
 		return nil, APIError{Message: fmt.Sprintf("Invalid order type: %s. Available types: %s, %s, %s", orderType, TifGtc, TifIoc, TifAlo)}
@@ -374,8 +391,11 @@ func (api *ExchangeAPI) LimitOrder(orderType string, coin string, size float64, 
 		OrderType:  orderTypeZ,
 		ReduceOnly: reduceOnly,
 	}
-	if len(clientOID) > 0 {
-		orderRequest.Cloid = clientOID[0]
+	if len(cloid) > 0 {
+		if _, err := HexToInt(cloid[0]); err != nil {
+			return nil, err
+		}
+		orderRequest.Cloid = cloid[0]
 	}
 	return api.Order(orderRequest, GroupingNa)
 }
@@ -422,12 +442,42 @@ func (api *ExchangeAPI) ClosePosition(coin string) (*OrderResponse, error) {
 
 // OrderSpot places a spot order
 func (api *ExchangeAPI) OrderSpot(request OrderRequest, grouping Grouping) (*OrderResponse, error) {
-	return api.BulkOrders([]OrderRequest{request}, grouping, true)
+	return api.BulkOrders([]OrderRequest{request}, grouping)
 }
 
 // Cancel exact order by OID
-func (api *ExchangeAPI) CancelOrderByOID(coin string, orderID int64) (*OrderResponse, error) {
-	return api.BulkCancelOrders([]CancelOidWire{{Asset: api.meta[coin].AssetId, Oid: int(orderID)}})
+func (api *ExchangeAPI) CancelOrderByOID(coin string, orderID int) (*OrderResponse, error) {
+	meta := api.meta
+	if strings.ContainsAny(coin, "@-") {
+		meta = api.spotMeta
+	}
+	assetID := meta[coin].AssetID
+	return api.BulkCancelOrders([]CancelOidWire{{Asset: assetID, Oid: orderID}})
+}
+
+func (api *ExchangeAPI) BulkCancelOrdersByCloid(cancels []CancelCloidWire) (*OrderResponse, error) {
+	if len(cancels) == 0 {
+		return nil, APIError{Message: "no cloID entries provided"}
+	}
+	nonceValue := GetNonce()
+
+	action := CancelCloidOrderAction{
+		Type:    "cancelByCloid",
+		Cancels: cancels,
+	}
+	v, r, s, err := api.SignL1Action(action, nonceValue)
+	if err != nil {
+		api.debug("BulkCancelOrdersByCloid sign error: %s", err)
+		return nil, err
+	}
+	vaultAddress := api.VaultAddress()
+	request := ExchangeRequest{
+		Action:       action,
+		Nonce:        nonceValue,
+		Signature:    ToTypedSig(r, s, v),
+		VaultAddress: &vaultAddress,
+	}
+	return MakeUniversalRequest[OrderResponse](api, request)
 }
 
 // Cancel all orders for a given coin
@@ -442,7 +492,7 @@ func (api *ExchangeAPI) CancelAllOrdersByCoin(coin string) (*OrderResponse, erro
 		if coin != order.Coin {
 			continue
 		}
-		cancels = append(cancels, CancelOidWire{Asset: api.meta[coin].AssetId, Oid: int(order.Oid)})
+		cancels = append(cancels, CancelOidWire{Asset: api.meta[coin].AssetID, Oid: int(order.Oid)})
 	}
 	return api.BulkCancelOrders(cancels)
 }
@@ -459,7 +509,32 @@ func (api *ExchangeAPI) CancelAllOrders() (*OrderResponse, error) {
 	}
 	var cancels []CancelOidWire
 	for _, order := range *orders {
-		cancels = append(cancels, CancelOidWire{Asset: api.meta[order.Coin].AssetId, Oid: int(order.Oid)})
+		cancels = append(cancels, CancelOidWire{Asset: api.meta[order.Coin].AssetID, Oid: int(order.Oid)})
 	}
 	return api.BulkCancelOrders(cancels)
+}
+
+// GetMeta returns the asset info for the given request.
+// If the request is a spot request, it returns the spot meta map.
+// Returns empty AssetInfo if coin not found in meta map.
+func (api *ExchangeAPI) GetMeta(req OrderRequest) AssetInfo {
+	if req.Coin == "" {
+		return AssetInfo{}
+	}
+
+	meta := api.meta
+	if req.isSpot() {
+		if api.spotMeta == nil {
+			return AssetInfo{}
+		}
+		meta = api.spotMeta
+	} else if api.meta == nil {
+		return AssetInfo{}
+	}
+
+	assetInfo, exists := meta[req.Coin]
+	if !exists {
+		return AssetInfo{}
+	}
+	return assetInfo
 }

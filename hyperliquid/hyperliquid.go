@@ -10,16 +10,20 @@ type Hyperliquid struct {
 	InfoAPI
 }
 
-// HyperliquidClientConfig is a configuration struct for Hyperliquid API.
-// PrivateKey can be empty if you only need to use the public endpoints.
-// AccountAddress is the default account address for the API that can be changed with SetAccountAddress().
-// AccountAddress may be different from the address build from the private key due to Hyperliquid's account system.
+// HyperliquidClientConfig represents the configuration options for the Hyperliquid client.
+// It allows configuring the network type, private key, and account address settings.
+//
+// The configuration options include:
+//   - IsMainnet: Set to true for mainnet and false for testnet
+//   - PrivateKey: Optional key for authenticated endpoints (can be empty for public endpoints)
+//   - AccountAddress: Default account address used by the API (modifiable via SetAccountAddress)
 type HyperliquidClientConfig struct {
 	IsMainnet      bool
 	PrivateKey     string
 	AccountAddress string
 }
 
+// NewHyperliquid creates a new Hyperliquid API client.
 func NewHyperliquid(config *HyperliquidClientConfig) *Hyperliquid {
 	var defaultConfig *HyperliquidClientConfig
 	if config == nil {
@@ -36,10 +40,12 @@ func NewHyperliquid(config *HyperliquidClientConfig) *Hyperliquid {
 	exchangeAPI.SetAccountAddress(defaultConfig.AccountAddress)
 	infoAPI := NewInfoAPI(defaultConfig.IsMainnet)
 	infoAPI.SetAccountAddress(defaultConfig.AccountAddress)
-	return &Hyperliquid{
+	hl := &Hyperliquid{
 		ExchangeAPI: *exchangeAPI,
 		InfoAPI:     *infoAPI,
 	}
+	hl.UpdateAccountVaultAddress()
+	return hl
 }
 
 func (h *Hyperliquid) SetDebugActive() {
@@ -60,6 +66,18 @@ func (h *Hyperliquid) SetAccountAddress(accountAddress string) {
 	h.InfoAPI.SetAccountAddress(accountAddress)
 }
 
+func (h *Hyperliquid) UpdateAccountVaultAddress() {
+	h.UpdateVaultAddress(h.AccountAddress())
+}
+
+func (h *Hyperliquid) UpdateVaultAddress(address string) error {
+	role, err := h.InfoAPI.GetUserRole(address)
+	if err != nil {
+		return err
+	}
+	h.ExchangeAPI.SetUserRole(role.UserRole.Role)
+	return nil
+}
 func (h *Hyperliquid) AccountAddress() string {
 	return h.ExchangeAPI.AccountAddress()
 }

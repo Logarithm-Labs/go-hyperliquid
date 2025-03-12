@@ -214,7 +214,7 @@ func TestExchangeAPI_CreateLimitOrderAndCancelOrderByOid(t *testing.T) {
 		t.Errorf("Order not found: %v", openOrders)
 	}
 	time.Sleep(5 * time.Second) // wait to execute order
-	cancelRes, err := exchangeAPI.CancelOrderByOID(coin, orderOid)
+	cancelRes, err := exchangeAPI.CancelOrderByOID(coin, int(orderOid))
 	if err != nil {
 		t.Errorf("CancelOrderByOid() error = %v", err)
 	}
@@ -243,7 +243,7 @@ func TestExchangeAPI_TestModifyOrder(t *testing.T) {
 			break
 		}
 	}
-	log.Printf("Order ID: %v", res.Response.Data.Statuses[0].Resting.OrderId)
+	log.Printf("Order ID: %v", res.Response.Data.Statuses[0].Resting.OrderID)
 	if !orderOpened {
 		t.Errorf("Order not found: %+v", openOrders)
 	}
@@ -255,8 +255,10 @@ func TestExchangeAPI_TestModifyOrder(t *testing.T) {
 			Tif: TifGtc,
 		},
 	}
-	modifyOrderRequest := ModifyOrderRequest{
-		OrderId:    res.Response.Data.Statuses[0].Resting.OrderId,
+	orderID := res.Response.Data.Statuses[0].Resting.OrderID
+
+	modifyOrderRequest := OrderRequest{
+		OrderID:    &orderID,
 		Coin:       coin,
 		Sz:         size,
 		LimitPx:    newPx,
@@ -264,7 +266,7 @@ func TestExchangeAPI_TestModifyOrder(t *testing.T) {
 		IsBuy:      true,
 		ReduceOnly: false,
 	}
-	modifyRes, err := exchangeAPI.BulkModifyOrders([]ModifyOrderRequest{modifyOrderRequest}, false)
+	modifyRes, err := exchangeAPI.BulkModifyOrders([]OrderRequest{modifyOrderRequest})
 	if err != nil {
 		t.Errorf("ModifyOrder() error = %v", err)
 	}
